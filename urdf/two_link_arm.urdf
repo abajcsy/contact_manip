@@ -1,0 +1,76 @@
+<?xml version="1.0" ?>
+<robot name="two_link_arm">
+	<!-- ********** KINEMATIC PROPERTIES (JOINTS) ********** -->
+	<joint name="joint0" type="revolute">
+		<parent link="root"/>
+		<child link="link1"/>
+		<origin rpy="0.0 0 0.0" xyz="0.0 0.0 0.0"/>
+		<axis xyz="1 0 0"/>
+		<limit effort="30" lower="-1.5708" upper="1.5708" velocity="5"/>
+	</joint>
+	<joint name="joint1" type="revolute">
+		<parent link="link1"/>
+		<child link="link2"/>
+		<origin rpy="0.0 0.0 0" xyz="0.0 0.0 0.4"/>
+		<axis xyz="1 0 0"/>
+		<limit effort="30" lower="-1.5708" upper="1.5708" velocity="5"/>
+	</joint>
+	
+	<!-- ********** INERTIAL PROPERTIES (LINKS) ********** -->
+	<link name="root" type="static">
+	    <collision>
+	      <origin rpy="0 0 0" xyz="0 0 0"/>
+	      <geometry>
+	        <box size="0 0 0"/>
+	      </geometry>
+	    </collision>
+	</link>
+	<link name="link1">
+		<intertial>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<mass value="1"/>
+			<inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100"/>
+		</intertial>
+
+		<visual>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<geometry>
+				<cylinder radius="0.05" length="0.4"/>
+			</geometry>
+			<material name="grey">
+				<color rgba="0.5 0.5 0.5 1.0"/>
+			</material>
+		</visual>
+
+		<collision>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<geometry>
+				<cylinder radius="0.05" length="0.4"/>
+			</geometry>
+		</collision>
+	</link>
+	<link name="link2">
+		<intertial>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<mass value="1"/>
+			<inertia ixx="100" ixy="0" ixz="0" iyy="100" iyz="0" izz="100"/>
+		</intertial>
+
+		<visual>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<geometry>
+				<cylinder radius="0.05" length="0.4"/>
+			</geometry>
+			<material name="grey">
+				<color rgba="0.5 0.5 0.5 1.0"/>
+			</material>
+		</visual>
+
+		<collision>
+			<origin xyz="0 0 0.2" rpy="0 0 0"/>
+			<geometry>
+				<cylinder radius="0.05" length="0.4"/>
+			</geometry>
+		</collision>
+	</link>
+</robot>

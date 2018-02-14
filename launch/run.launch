@@ -1,0 +1,14 @@
+<launch>
+
+  <param name="robot_description" textfile="$(find contact_manip)/urdf/two_link_arm.urdf" />
+  <arg name="rvizconfig" default="$(find contact_manip)/rviz/manip.rviz" />
+  
+
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+  	<param name="use_gui" value="true" />
+  </node> 
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
+  <node name="manipulation" pkg="contact_manip" type="test.py" output="screen"/>
+</launch>
