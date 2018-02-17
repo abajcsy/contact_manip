@@ -3,7 +3,8 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Marker1
       Splitter Ratio: 0.74
     Tree Height: 730
   - Class: rviz/Selection
@@ -73,11 +74,6 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        link3:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         root:
           Alpha: 1
           Show Axes: false
@@ -98,8 +94,6 @@ Visualization Manager:
           Value: true
         link2:
           Value: true
-        link3:
-          Value: true
         root:
           Value: true
       Marker Scale: 1
@@ -111,9 +105,16 @@ Visualization Manager:
         root:
           link1:
             link2:
-              link3:
-                {}
+              {}
       Update Interval: 0
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: visualization_marker
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -151,10 +152,10 @@ Visualization Manager:
         Z: 0
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.785398
+      Pitch: 0.300399
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 0.785398
+      Yaw: 6.22358
     Saved: ~
 Window Geometry:
   Displays:
