@@ -20,8 +20,9 @@ for t = 1:size(qs, 2)
     
 %     text(p2(1), p2(2) + 0.5, strcat('t = ', num2str(t)));
     text(ptext(2), ptext(3), strcat('t = ', num2str(t - 1)));
-    axis([-3 3 0 3]);
-%     axis([-3 3 -3 3]);
+%     axis([-3 3 0 3]);
+    axis([-3 3 -1 3]);
+    plot([-3 3], [0 0], 'b');
     
     if ~isempty(filename)
         frame = getframe(fig);

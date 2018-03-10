@@ -11,15 +11,19 @@ g = 9.81;
 I1x = (m1 * l1^2) / 12.0;
 I2x = (m2 * l2^2) / 12.0;
 
+M = two_link_inertia_matrix(I1x, I2x, l1, l2, m1, m2, th1, th2);
+C = two_link_coriolis_matrix(dth1, dth2, l1, l2, m1, m2, th1, th2);
+N = two_link_gravity_matrix(g, l1, l2, m1, m2, th1, th2);
+
 % Inertia matrix
-M = [I1x + I2x + 0.25 * l1^2 * m1 + l1^2 * m2 * sin(th2)^2 + m2 * (0.5 * l1 * cos(th2) + 0.25 * l2)^2 I2x + 0.5 * l2 * m2 * (0.5 * l1 * cos(th2) + 0.25 * l2); 
-     I2x + 0.5 * l2 * m2 * (0.5 * l1 * cos(th2) + 0.25 * l2) I2x + 0.25 * l2^2 * m2];
+% M = [I1x + I2x + 0.25 * l1^2 * m1 + l1^2 * m2 * sin(th2)^2 + m2 * (0.5 * l1 * cos(th2) + 0.25 * l2)^2 I2x + 0.5 * l2 * m2 * (0.5 * l1 * cos(th2) + 0.25 * l2); 
+%      I2x + 0.5 * l2 * m2 * (0.5 * l1 * cos(th2) + 0.25 * l2) I2x + 0.25 * l2^2 * m2];
 
 % Coriolis matrix 
-C = [dth2 * l1 * m2 * (0.75 * l1 * cos(th2) - 0.125 * l2) * sin(th2) l1 * m2 * (0.75 * dth1 * l1 * cos(th2) - 0.125 * dth1 * l2 - 0.25 * dth2 * l2) * sin(th2);
-     l1 * m2 * (-0.75 * dth1 * l1 * cos(th2) + 0.125 * dth1 * l2 - 0.125 * dth2 * l2) * sin(th2) -0.375 * dth1 * l1^2 * m2 * sin(2 * th2)];
+% C = [dth2 * l1 * m2 * (0.75 * l1 * cos(th2) - 0.125 * l2) * sin(th2) l1 * m2 * (0.75 * dth1 * l1 * cos(th2) - 0.125 * dth1 * l2 - 0.25 * dth2 * l2) * sin(th2);
+%      l1 * m2 * (-0.75 * dth1 * l1 * cos(th2) + 0.125 * dth1 * l2 - 0.125 * dth2 * l2) * sin(th2) -0.375 * dth1 * l1^2 * m2 * sin(2 * th2)];
  
 % Potential forces matrix 
-N = [-g * (0.5 * l1 * m1 * sin(th1) + l1 * m2 * sin(th1) + 0.5 * l2 * m2 * sin(th1 + th2));
-     -0.5 * g * l2 * m2 * sin(th1 + th2)];
+% N = [-g * (0.5 * l1 * m1 * sin(th1) + l1 * m2 * sin(th1) + 0.5 * l2 * m2 * sin(th1 + th2));
+%      -0.5 * g * l2 * m2 * sin(th1 + th2)];
 end
