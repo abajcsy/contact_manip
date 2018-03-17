@@ -1,0 +1,32 @@
+%% Plot arm trajectory over time
+function plot_arm(traj,N)
+clf
+for t = 0:N
+    q = get_q(traj, t);
+    [g_sl1, g_st] = two_link_kinematics(q(1), q(2));
+
+    p0 = [0 0];
+    p1 = [g_sl1(2, 4) g_sl1(3, 4)];
+    p2 = [g_st(2, 4) g_st(3, 4)];
+
+    figure(1);
+    hold on;
+    link1 = plot([p0(1) p1(1)], [p0(2) p1(2)], 'k');
+    link2 = plot([p1(1) p2(1)], [p1(2) p2(2)], 'k');
+    set(link1,'LineWidth',2);
+    set(link2,'LineWidth',2);
+    link1.Color(4)(link1,(t+1)/N);
+    
+    text(p2(1)-0.2,p2(2)+0.2,strcat('t=',num2str(t)));
+    plot([p0(1) p1(1) p2(1)], [p0(2) p1(2) p2(2)], 'o', 'MarkerFaceColor','r','MarkerEdgeColor','r');
+    axis([-2 2 0 3]);
+
+    pause(0.5);
+end
+
+end
+
+%% Getting a configuration at a specific time
+function [q] = get_q(x, t)
+    q = x(4 * t + 1:4 * t + 2);
+end

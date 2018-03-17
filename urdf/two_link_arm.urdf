@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <robot name="two_link_arm">
 	<!-- ********** KINEMATIC PROPERTIES (JOINTS) ********** -->
 	<joint name="joint0" type="revolute">

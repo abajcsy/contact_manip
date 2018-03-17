@@ -4,6 +4,8 @@ import rospy
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker
 import tf
+import sys, select, os
+import sensor_msgs.msg
 
 class TwoLinkArm:
 	"""
@@ -62,8 +64,8 @@ class TwoLinkArm:
 		JCOM1 = np.zeros((6,2))
 		#JCOM1[0,0] = self.l1 / 2. * -np.sin(q[0])
 		#JCOM1[1,0] = self.l1 / 2. * np.cos(q[0])
-		JCOM1[0,0] = self.l1 * -np.sin(q[0])
-		JCOM1[1,0] = self.l1 * np.cos(q[0])
+		JCOM1[0,0] = self.l1 / 2. * -np.sin(q[0])
+		JCOM1[1,0] = self.l1 / 2. * np.cos(q[0])
 		JCOM1[5,0] = 1.0
 
 		return JCOM1
@@ -79,8 +81,8 @@ class TwoLinkArm:
 		# define column entries right to left
 		#JCOM2[0,1] = self.l2 / 2. * -np.sin(q[0]+q[1])
 		#JCOM2[1,1] = self.l2 / 2. * np.cos(q[0]+q[1])
-		JCOM2[0,1] = self.l2 * -np.sin(q[0]+q[1])
-		JCOM2[1,1] = self.l2 * np.cos(q[0]+q[1])
+		JCOM2[0,1] = self.l2 / 2. * -np.sin(q[0]+q[1])
+		JCOM2[1,1] = self.l2 / 2. * np.cos(q[0]+q[1])
 		JCOM2[5,1] = 1.0
 
 		JCOM2[0,0] = self.l1 * -np.sin(q[0]) + JCOM2[0,1]
@@ -97,10 +99,10 @@ class TwoLinkArm:
 
 		JEE = np.zeros((2,2))
 		# define column entries right to left
-		JEE[0,1] = -self.l2 * np.sin(q[0]+q[1])
+		JEE[0,1] = self.l2 * -np.sin(q[0]+q[1])
 		JEE[1,1] = self.l2 * np.cos(q[0]+q[1])
 
-		JEE[0,0] = -self.l1 * np.sin(q[0]) + JEE[0,1]
+		JEE[0,0] = self.l1 * -np.sin(q[0]) + JEE[0,1]
 		JEE[1,0] = self.l1 * np.cos(q[0]) + JEE[1,1]
 
 		return JEE
@@ -182,12 +184,75 @@ class TwoLinkArm:
 		return scipy.optimize.minimize(fun=distance_to_target, x0=self.q,
 			args=([xy[0], xy[1]], self.L))['x']
 
+	def apply_torque(self, u, dt=None):
+		"""
+		Takes in a torque and time step and updates the
+		arm simulation accordingly.
+
+		Solves for ddq, dq, q given u: 
+		u = M(q)*ddq + V(q,dq) + G(q)
+
+		u np.array: the control signal to apply
+		dt float: the time step
+		"""
+		if dt is None:
+			dt = self.dt
+
+		# equations solved for angles
+		C1 = np.cos(self.q[0])
+		C2 = np.cos(self.q[1])
+		S2 = np.sin(self.q[1])
+		C12 = np.cos(self.q[0] + self.q[1])
+
+		# generate entries of M(q) mass matrix
+		M11 = (self.K1 + self.K2*C2)
+		M12 = (self.K3 + self.K4*C2)
+		M21 = M12
+		M22 = self.K3
+
+		# generate coriolis forces matrix V(q,dq)
+		#print "dq: " + str(self.dq)
+		V1 = -self.K4*S2*(2.0*self.dq[0]*self.dq[1] +self.dq[1]**2.0) 
+		V2 = self.K4*S2*self.dq[0]**2.0
+
+		# generate gravity forces matrix G(q)
+		g = -9.81
+		G1 = (self.m1 + self.m2)*g*self.l1*C1 + self.m2*g*self.l2*C12
+		G2 = self.m2*g*self.l2*C12
+
+		# computation without gravity terms
+		#ddq1 = (M11*u[1] - M21*u[0] + M21*V1 - M11*V2) / (M11*M22 - M12**2.0)
+		#ddq0 = (u[0] - M12*ddq1 - V1 ) / M11
+
+		# computation WITH gravity terms
+		#ddq1 = (M11*u[1] - M21*u[0] + M21*V1 + M21*G1 - M11*V2 - M11*G2) / (M11*M22 - M12**2.0)
+		ddq1 = (M12*u[0] - M12*V1 - M12*G1 + M11*(V2 + G2 - u[1])) / (M12**2.0 - M22*M11)        
+		ddq0 = (u[0] - M12*ddq1 - V1 - G1) / M11
+
+		self.dq += np.array([ddq0, ddq1]) * dt
+		self.q += self.dq * dt
+
+		# transfer to next time step
+		self.t += dt
+
 	def joint_callback(self, msg):
 		"""
 		Save joint state message from ROS.
 		"""
 		self.joints_msg = msg
 		print self.joints_msg.position[0], self.joints_msg.position[1]
+
+	def to_JointState(self):
+		"""
+		Converts current configuration into a joint state message for ROS.
+		"""
+		msg = sensor_msgs.msg.JointState()
+		msg.header.stamp = rospy.Time.now()
+		msg.header.frame_id = ''
+		msg.name = ['joint0', 'joint1']
+		msg.position = [self.q[0], self.q[1]]
+		msg.velocity = [self.dq[0],self.dq[1]]
+		return msg
 
 if __name__ == '__main__':
 	# setup 2 link arm
@@ -203,10 +268,35 @@ if __name__ == '__main__':
 	rate = rospy.Rate(100)
 
 	# set up subscribers to the joint state and publishers for markers
-	joint_state_sub = rospy.Subscriber('/joint_states', JointState, arm.joint_callback)
+	#joint_state_sub = rospy.Subscriber('/joint_states', JointState, arm.joint_callback)
+	joint_state_pub = rospy.Publisher('/joint_states', JointState, queue_size=10)
 	marker_pub = rospy.Publisher('/visualization_marker', Marker, queue_size=10)
 
+	print "\nEnter <x-dir force> <y-dir force> to apply a force at the end-effector:"
 	while not rospy.is_shutdown():
+		if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+			line = raw_input()
+			splt = line.split()
+			if len(splt) == 2:
+				fin = map(float, splt)
+				arm.fEE = np.array(fin)
+				print "Force applied: ", arm.fEE
+				f = arm.gen_Fq(forceEE=arm.fEE)
+				q = arm.q
+				normf = np.linalg.norm(f)
+				normq = np.linalg.norm(q)
+				direction  = np.dot(f, q)
+				print "Direction: ", direction
+				print "Config (before): ", arm.q
+
+		        # if user entered a force at EE, apply it to torque
+				arm.apply_torque(f, dt=arm.dt)
+				print "Config (after): ", arm.q
+
+		# update the visualization with the current joint state
+		joint_state_pub.publish(arm.to_JointState())
+
+		"""
 		if arm.joints_msg is not None:
 			q = [arm.joints_msg.position[0], arm.joints_msg.position[1]]
 			xy = arm.fwd_kinematics(q)
@@ -234,5 +324,6 @@ if __name__ == '__main__':
 			marker.color.b = 0.8
 			marker.color.a = 0.5
 			marker_pub.publish(marker)
+		"""
 
 	rate.sleep()
