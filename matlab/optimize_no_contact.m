@@ -14,12 +14,15 @@ h = 0.1;
 % q_init = [0; pi / 2];
 % q_init = [0; pi / 4];
 q_init = [0; 0];
+dq_init = [0; 0];
 % q_final = [0.5; 0.25];
 % q_final = [-0.75; 0.5];
 q_final = [0; pi / 2];
+dq_final = [0; 0];
 
 % Tolerance on the final position of the end effector
-final_pos_thresh = 0.12;
+% final_pos_thresh = 0.12;
+final_pos_thresh = 0.01;
 
 % Limits on the joint angles
 q_limit_upp = [pi / 2; pi / 2];
@@ -52,10 +55,20 @@ for t = 0:T
         % Set initial config constraint
         xupp(4 * t + 1:4 * t + 2, 1) = q_init;
         xlow(4 * t + 1:4 * t + 2, 1) = q_init;
-    elseif t == T
-        % Set final config constraint
-        xupp(4 * t + 1:4 * t + 2, 1) = q_final;
-        xlow(4 * t + 1:4 * t + 2, 1) = q_final;
+        xupp(4 * t + 3:4 * t + 4, 1) = dq_init;
+        xlow(4 * t + 3:4 * t + 4, 1) = dq_init;
+%     elseif t == T
+%         % Set final config constraint
+%         xupp(4 * t + 1:4 * t + 2, 1) = q_final;
+%         xlow(4 * t + 1:4 * t + 2, 1) = q_final;
+%         xupp(4 * t + 3:4 * t + 4, 1) = dq_final;
+%         xlow(4 * t + 3:4 * t + 4, 1) = dq_final;
+%     elseif t == T - 1
+%         % Set final config constraint
+%         xupp(4 * t + 1:4 * t + 2, 1) = q_final;
+%         xlow(4 * t + 1:4 * t + 2, 1) = q_final;
+%         xupp(4 * t + 3:4 * t + 4, 1) = dq_final;
+%         xlow(4 * t + 3:4 * t + 4, 1) = dq_final;        
     else
         % Set joint limits and joint velocity limits
         xupp(4 * t + 1:4 * t + 2, 1) = q_limit_upp;
@@ -124,13 +137,19 @@ two_link_draw(qs, h, 'test2.gif');
 
 us_1 = zeros(1, T);
 us_2 = zeros(1, T);
+dqs_1 = zeros(1, T);
+dqs_2 = zeros(1, T);
 ts = linspace(1, T, T);
 for t = 1:T
     u = get_u(x, t, T);
     us_1(1, t) = u(1);
     us_2(1, t) = u(2);
+    dq = get_dq(x, t);
+    dqs_1(1, t) = dq(1);
+    dqs_2(1, t) = dq(2);
 end
 
+% Plot joint torques
 figure(2);
 
 subplot(2, 1, 1);
@@ -144,6 +163,22 @@ plot(ts, us_2);
 axis([1 T u_limit_low(2) - 1 u_limit_upp(2) + 1]);
 xlabel('time $t$', 'Interpreter', 'latex');
 ylabel('$u_2(t)$', 'Interpreter', 'latex');
+
+% Plot joint velocities
+figure(3);
+
+subplot(2, 1, 1);
+plot(ts, dqs_1);
+axis([1 T min(dqs_1) - 1 max(dqs_1) + 1]);
+xlabel('time $t$', 'Interpreter', 'latex');
+ylabel('$\dot{q}_1(t)$', 'Interpreter', 'latex');
+
+subplot(2, 1, 2);
+plot(ts, dqs_2);
+axis([1 T min(dqs_2) - 1 max(dqs_2) + 1]);
+xlabel('time $t$', 'Interpreter', 'latex');
+ylabel('$\dot{q}_2(t)$', 'Interpreter', 'latex');
+
 
 function [F] = userfun(x)
 T = 10;
@@ -168,11 +203,11 @@ end
 % Note: we actually constrain the last two positions of the end effector
 % because we want the manipulator to stabilize at that position
 d = 0;
-% for t = T-1:T
-%     q = get_q(x, t);
-%     [~, g_st] = two_link_kinematics(q(1), q(2));
-%     d = d + norm(g_st(1:3, 4) - pos_final);
-% end
+for t = T-1:T
+    q = get_q(x, t);
+    [~, g_st] = two_link_kinematics(q(1), q(2));
+    d = d + norm(g_st(1:3, 4) - pos_final);
+end
 
 F = [get_u(x, T, T)' * get_u(x, T, T); q_cons; dynam_cons; d];
 end
