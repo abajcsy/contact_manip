@@ -1,5 +1,5 @@
 %% Plot arm trajectory over time
-function plot_arm(traj,N,filename)
+function plot_arm(traj,times,N,filename)
 clf
 fig = figure(1);
 hold on;
@@ -16,11 +16,17 @@ for t = 0:N
     
     link1 = plot([p0(1) p1(1)], [p0(2) p1(2)], 'k');
     link2 = plot([p1(1) p2(1)], [p1(2) p2(2)], 'k');
-    set(link1,'LineWidth',2);
-    set(link2,'LineWidth',2);
+    set(link1,'LineWidth',5);
+    set(link2,'LineWidth',5);
     link1.Color(4) = alpha;
     link2.Color(4) = alpha;
-    text(p2(1)-0.2,p2(2)+0.2,strcat('t=',num2str(t)));
+    % plot the delta t
+    if t ~= 0
+        dt_text = text(p2(1)+0.05,p2(2)+0.1,strcat('dt=',num2str(times(t))));
+        dt_text.Color = [0.5 0.5 0.5];
+    end
+    % plot the sequence in time
+    %text(p2(1)-0.2,p2(2)+0.2,strcat('t=',num2str(t)));
     % color the two active joints in red
     scatter([p0(1) p1(1)], [p0(2) p1(2)], 'o', 'MarkerFaceColor','r','MarkerEdgeColor','r', 'MarkerFaceAlpha', alpha, 'MarkerEdgeAlpha', alpha);
     % color the EE separately
@@ -44,8 +50,9 @@ for t = 0:N
         end
     end
 
-    pause(0.1);
-    
+    if t ~= N
+        pause(times(t+1));
+    end
 end
 hold off;
 end
