@@ -74,6 +74,40 @@ classdef TwoLinkArm
                     obj.l1*cos(th1) 0];
         end
         
+        function plot_traj(obj, traj)
+            clf
+            fig = figure(1);
+            hold on;
+
+            for t = 0:size(traj, 1) - 1
+                q = traj(t + 1, :)';
+                [pos_elbow, pos_ee] = obj.fwd_kinematics(q);
+
+                p0 = [0 0];
+
+                alpha = (t+1)/(size(traj, 1)+1);
+    
+                link1 = plot([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'k');
+                link2 = plot([pos_elbow(1) pos_ee(1)], [pos_elbow(2) pos_ee(2)], 'k');
+                set(link1,'LineWidth',5);
+                set(link2,'LineWidth',5);
+                link1.Color(4) = alpha;
+                link2.Color(4) = alpha;
+
+                scatter([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'o', 'MarkerFaceColor','r','MarkerEdgeColor','r', 'MarkerFaceAlpha', alpha, 'MarkerEdgeAlpha', alpha);
+                scatter(pos_ee(1), pos_ee(2), 'o', 'MarkerFaceColor','k','MarkerEdgeColor','k', 'MarkerFaceAlpha', alpha, 'MarkerEdgeAlpha', alpha);
+    
+                axis([-2 2 0 3]);
+    
+                set(gca,'YTick',[]);
+                set(gca,'XTick',[]);
+    
+                if t ~= size(traj, 1)
+                    pause(0.1);
+                end
+            end
+            hold off;
+        end
         
     end
 end

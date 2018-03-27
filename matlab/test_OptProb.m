@@ -3,7 +3,8 @@ q_init = [0; 0; 0; 0];
 q_final = [0; pi / 2; 0; 0];
 T = 5;
 k = 2;
-optProb = OptProb(arm, q_init, q_final, T, @g, @g_f, k);
+eps = 0.01;
+optProb = OptProb(arm, q_init, q_final, T, @g, @g_f, k, eps);
 
 x = [1:1:optProb.num_states + optProb.num_controls + optProb.num_lambdas + optProb.T]';
 
@@ -44,8 +45,18 @@ end
 
 assert(isequal(xp, x));
 
-[x, xlow, xupp, F, ~, ~] = optProb.generate();
-F(x)
+[x, xlow, xupp, F, Flow, Fupp] = optProb.generate();
+% F(x)
+% Flow
+% Fupp
+% x
+traj = zeros(T + 1, arm.dof);
+for t = 0:T
+   q = optProb.get_q(x, t);
+   traj(t + 1, :) = q';
+end
+
+arm.plot_traj(traj);
 
 function run_cost = g(q_t, dq_t, u_t1)
     run_cost = 1;

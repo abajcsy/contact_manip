@@ -16,10 +16,11 @@ classdef OptProb
         g           % Function that is used to compute objective
         g_f       
         k           % Number of timesteps to consider when computing EE dist from final pose
+        eps         % Tolerance on EE dist from final pose
     end
     
     methods
-        function obj = OptProb(arm, q_init, q_final, T, g, g_f, k)
+        function obj = OptProb(arm, q_init, q_final, T, g, g_f, k, eps)
             %OPTPROB Construct an instance of this class
             %   
             %   g and g_f are used compute objective: 
@@ -46,6 +47,7 @@ classdef OptProb
             obj.g_f = g_f;
             
             obj.k = k;
+            obj.eps = eps;
         end
         
         function [x, xlow, xupp, F, Flow, Fupp] = generate(obj)
@@ -169,13 +171,32 @@ classdef OptProb
             
             F = @func;
             
-            Flow = [];
-            Fupp = [];
+            % objective                 1
+            % kin_constraints           dof * T
+            % dyn_constraints           dof * T
+            % phi_constraints           T * c
+            % phi_lambda_constraints    T
+            % h_constraints             floor((T - 3) / 2)
+            % ee_dist                   1
+            num_constraints = 2 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
+            Flow = zeros(num_constraints, 1);
+            Fupp = zeros(num_constraints, 1);
+            
+            % Bounds on the objective
+            Flow(1) = -1000;
+            Fupp(1) = 1000;
+            
+            % Tolerance on EE dist to final pose
+            Flow(num_constraints) = 0;
+            Fupp(num_constraints) = obj.eps;
+            
+            % Upper bound on the signed distance 
+            Fupp(1 + 2 * obj.arm.dof * obj.T + 1:1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T) = 50;
         end
         
         function p = lin_interp(obj, p_start, p_end, t)
-            % TODO implement linear interpolation
-            p = zeros(size(p_start));
+            % Interpolates a single point at time t
+            p = p_start + (t / obj.T) * (p_end - p_start);
         end
         
         function q = get_q(obj, x, t)
