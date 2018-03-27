@@ -1,5 +1,9 @@
 arm = TwoLinkArm(2, 1, 1, 1, 1, 1);
-optProb = OptProb(arm, [0; 0; 0; 0], [0; pi / 2; 0; 0], 50);
+q_init = [0; 0; 0; 0];
+q_final = [0; pi / 2; 0; 0];
+T = 5;
+k = 2;
+optProb = OptProb(arm, q_init, q_final, T, @g, @g_f, k);
 
 x = [1:1:optProb.num_states + optProb.num_controls + optProb.num_lambdas + optProb.T]';
 
@@ -42,3 +46,11 @@ assert(isequal(xp, x));
 
 [x, xlow, xupp, F, ~, ~] = optProb.generate();
 F(x)
+
+function run_cost = g(q_t, dq_t, u_t1)
+    run_cost = 1;
+end
+
+function final_cost = g_f(q_T, dq_T)
+    final_cost = 0.5;
+end
