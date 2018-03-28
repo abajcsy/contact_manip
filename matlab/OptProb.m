@@ -329,6 +329,23 @@ classdef OptProb
             end
         end
         
+        function traj_dq = get_traj_dq(obj, x)
+            % Extract just the joint velocities from the solution
+            traj_dq = zeros(obj.T + 1, obj.arm.dof);
+            for t = 0:obj.T
+               q = obj.get_dq(x, t);
+               traj_dq(t + 1, :) = q';
+            end
+        end
+        
+        function traj_u = get_traj_u(obj, x)
+            % Extract just the joint torques (control inputs) from the solution
+            traj_u = zeros(obj.T, obj.arm.dof);
+            for t = 1:obj.T
+               q = obj.get_u(x, t);
+               traj_u(t, :) = q';
+            end            
+        end
     end
 end
 
