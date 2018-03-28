@@ -13,6 +13,9 @@ classdef TwoLinkArm
         dq_max
         u_min   % Control torque limits
         u_max
+        alpha   % Constants for equations of motion
+        beta
+        delta
     end
     
     methods
@@ -42,7 +45,20 @@ classdef TwoLinkArm
             obj.dq_max = [20; 20];
             obj.u_min = [-5; -5];
             obj.u_max = [5; 5];
+            
+            % moment of inertia for rod of length l and mass m rotating
+            % about its center
+            Ix1 = (m1*l1^2)/12.0;
+            Ix2 = (m2*l2^2)/12.0;
+
+            % compute constants in the matrix
+            obj.alpha = Ix1 + Ix2 + m1*(l1/2.)^2 + m2*(l1^2 + (l2/2.)^2);
+            obj.beta = m2*l1*(l2/2.);
+            obj.delta = Ix2 + m2*(l2/2.)^2;
+
         end
+        
+        % -------------------- BEGIN DYNAMICS ------------------- %
         
         function [M,C,N] = dynamics(obj, q_t1, dq_t1)
             % Returns equation of motion matrices satisfying 
@@ -53,11 +69,49 @@ classdef TwoLinkArm
             % Outputs:  M   - inertial matrix (\in R^{dof, dof})
             %           C   - coriolis matrix (\in R^{dof, dof})
             %           N   - gravity matrix  (\in R^{dof})
-            M = zeros(obj.dof);
-            C = zeros(obj.dof);
-            N = zeros(obj.dof,1);
+            M = obj.get_M(q_t1);        
+            C = obj.get_C(q_t1, dq_t1); 
+            N = obj.get_N(q_t1);        
         end
         
+        function M = get_M(obj, q_t1)
+            % Computes the inertial matrix at time t for 2-link arm
+            %
+            % Inputs:   q_t1    - configuration of robot
+            % Outputs:  M       - intertial matrix
+            th2 = q_t1(2);
+            M = [obj.alpha + 2*obj.beta*cos(th2) obj.delta + obj.beta*cos(th2);
+                 obj.delta + obj.beta*cos(th2)   obj.delta];
+        end
+
+        function C = get_C(obj, q_t1, dq_t1)
+            %  Computes the coriolis and centrifugal forces acting on the joints
+            %
+            % Inputs:   q_t1    - configuration of robot
+            %           dq_t1   - joint velocities of robot
+            % Outputs:  C       - coriolis matrix
+            dth1 = dq_t1(1);
+            th2 = q_t1(2);
+            dth2 = dq_t1(2);
+
+            C = [-obj.beta*sin(th2)*dth2 -obj.beta*sin(th2)*(dth1+dth2);
+                 obj.beta*sin(th2)*dth1  0];
+        end
+
+        function N = get_N(obj, q_t1)
+            %  Computes the effect of gravity on the links
+            %
+            % Inputs:   q_t1    - configuration of robot
+            % Outputs:  N       - gravity matrix
+            th1 = q_t1(1);
+            th2 = q_t1(2);
+            g = 9.81;
+            N = [(obj.m1+obj.m2)*g*obj.l1*cos(th1)+obj.m2*g*obj.l2*cos(th1 + th2);
+                 obj.m2*g*obj.l2*cos(th1 + th2)];
+        end
+        
+        % -------------------- END DYNAMICS ------------------- %
+
         function [pos_elbow, pos_ee] = fwd_kinematics(obj, q_t1)
             % Returns the (x,y) position of elbow and end-effector
             %

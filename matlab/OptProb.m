@@ -13,12 +13,10 @@ classdef OptProb
         h_max           % Maximum timestep
         g           % Function used to compute running cost 
         g_f         % Function used to compute final cost
-        k           % Number of timesteps to consider when computing EE dist from final pose
-        eps         % Tolerance on EE dist from final pose
     end
     
     methods
-        function obj = OptProb(arm, q_init, q_final, T, g, g_f, k, eps)
+        function obj = OptProb(arm, q_init, q_final, T, g, g_f)
             %OPTPROB Constructor. 
             % Creates and optimization problem object that generates the
             % initial optimization variable, constraints, and relevant
@@ -30,8 +28,6 @@ classdef OptProb
             %           T       - number of timesteps (0...T)
             %           g       - used to compute running cost: h*\sum^T-1_t=0 g(q_t, u_{t+1})
             %           g_f     - used to compute final cost: g_f(q_T, \dot{q}_T) 
-            %           k       - num timesteps when computing EE dist from final pose
-            %           eps     - tolerance for EE dist from final pose
             % Output:   obj     - optimization problem object
             obj.arm = arm;
             % TODO right now, q_init, q_final have both joint position and
@@ -53,9 +49,6 @@ classdef OptProb
             
             obj.g = g;
             obj.g_f = g_f;
-            
-            obj.k = k;
-            obj.eps = eps;
         end
         
         function [x, xlow, xupp, F, Flow, Fupp] = generate(obj)
@@ -125,14 +118,13 @@ classdef OptProb
                 %                 objective, kinematic and dynamic 
                 %                 constraints for all timesteps, the phi 
                 %                 (signed-distance to obstacles), the 
-                %                 phi-lambda constraints, the timestep
-                %                 constraints, and the EE dist to pose
-                %                 constraint.
+                %                 phi-lambda constraints, and the timestep
+                %                 constraints
                 
                 % compute final cost
                 q_T = obj.get_q(x,obj.T);
                 dq_T = obj.get_dq(x,obj.T);
-                objective = obj.g_f(q_T, dq_T);
+                objective = obj.g_f(q_T, dq_T, obj.arm);
                 
                 % stores q_{t+1} = q_{t} + h * \dot{q}_{t+1}
                 kin_constraints = zeros(obj.arm.dof * obj.T, 1);
@@ -190,16 +182,7 @@ classdef OptProb
                     h_constraints(j) = h1+h2-h3-h4;
                 end
                 
-                % get the desired EE position from the final configuration
-                [~,target_ee] = obj.arm.fwd_kinematics(obj.q_final);
-                ee_dist = 0;
-                % sum up the cost of the EE deviating from final pose
-                for i=(obj.T-obj.k):obj.T
-                    [~,pos_ee] = obj.arm.fwd_kinematics(obj.get_q(x,i));
-                    ee_dist = ee_dist + norm(target_ee - pos_ee);
-                end
-                
-                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints; ee_dist];
+                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints];
             end
             
             F = @func;
@@ -211,18 +194,13 @@ classdef OptProb
             %   phi_constraints           T * c
             %   phi_lambda_constraints    T
             %   h_constraints             floor((T - 3) / 2)
-            %   ee_dist                   1
-            num_constraints = 2 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
+            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
             Flow = zeros(num_constraints, 1);
             Fupp = zeros(num_constraints, 1);
             
             % Bounds on the objective
             Flow(1) = -1000;
             Fupp(1) = 1000;
-            
-            % Tolerance on EE dist to final pose
-            Flow(num_constraints) = 0;
-            Fupp(num_constraints) = obj.eps;
             
             % Upper bound on the signed distance 
             Fupp(1 + 2 * obj.arm.dof * obj.T + 1:1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T) = 50;
@@ -338,7 +316,6 @@ classdef OptProb
             h_start = obj.num_states + obj.num_controls + obj.num_lambdas + 1;
             x(h_start + t - 1) = h;
         end
-        
         
         function traj = get_traj(obj, x)
             % Extract just the joint angles from optimization variable
