@@ -1,30 +1,34 @@
 classdef OptProb
-    %OPTPROB This class defines an optimization for a two link arm
-    %   Detailed explanation goes here
     
     properties
-        arm
-        q_init
-        q_final
-        T           % Number of time steps (0..T)
-        num_states
-        num_controls
-        num_lambdas
-        lambda_max
-        h_min
-        h_max
-        g           % Function that is used to compute objective
-        g_f       
-        k           % Number of timesteps to consider when computing EE dist from final pose
-        eps         % Tolerance on EE dist from final pose
+        arm             % Robot arm object
+        q_init          % Starting robot configuration (q,dq)
+        q_final         % Final robot configuration (q,dq)
+        T               % Number of time steps (0..T)
+        num_states      % Number of states (q,dq) in the optimization variable
+        num_controls    % Number of controls (u) 
+        num_lambdas     % Number of force lambda's
+        lambda_max      % Upper bound on lambda
+        h_min           % Minimum timestep
+        h_max           % Maximum timestep
+        g           % Function used to compute running cost 
+        g_f         % Function used to compute final cost
     end
     
     methods
-        function obj = OptProb(arm, q_init, q_final, T, g, g_f, k, eps)
-            %OPTPROB Construct an instance of this class
-            %   
-            %   g and g_f are used compute objective: 
-            %       g_f(q_T, \dot{q}_T) + h \sum^T-1_t=0 g(q_t, u_{t+1})
+        function obj = OptProb(arm, q_init, q_final, T, g, g_f)
+            %OPTPROB Constructor. 
+            % Creates and optimization problem object that generates the
+            % initial optimization variable, constraints, and relevant
+            % bounds for both. 
+            % 
+            % Inputs:   arm     - robot arm object
+            %           q_init  - initial robot state
+            %           q_final - final robot state
+            %           T       - number of timesteps (0...T)
+            %           g       - used to compute running cost: h*\sum^T-1_t=0 g(q_t, u_{t+1})
+            %           g_f     - used to compute final cost: g_f(q_T, \dot{q}_T) 
+            % Output:   obj     - optimization problem object
             obj.arm = arm;
             % TODO right now, q_init, q_final have both joint position and
             % velocities, change name?
@@ -45,27 +49,37 @@ classdef OptProb
             
             obj.g = g;
             obj.g_f = g_f;
-            
-            obj.k = k;
-            obj.eps = eps;
         end
         
         function [x, xlow, xupp, F, Flow, Fupp] = generate(obj)
-            %GENERATE 
-            %   Detailed explanation goes here
+            % Generates the optimization variable x, its bounds, and the
+            % constraints F as well as their bounds
+            % 
+            % Inputs:   n/a
+            % Outputs:  x       - optimization variable that consists of:
+            %                   [q_0, \dot{q}_0, ..., q_T, \dot{q}_T | u_1, ..., u_T | \lambda_1, ..., \lambda_T | h_1, ..., h_T]
+            %           xlow    - lower bound for optimization variable
+            %           xupp    - upper bound for optimization variable
+            %           F       - function that computes constraint vector
+            %           Flow    - lower bounds on constraint vector
+            %           Fupp    - upper bounds on constraint vector
+            %   where:
+            %           q_i \in R^{dof} 
+            %           \dot{q}_i \in R^{dof}
+            %           u_i \in R^{dof}
+            %           \lambda_i \in R^{c}
+            %           h_i \in \mathbb{R}
+            %   and:
+            %           dof     - robot degrees of freedom 
+            %           c       - number of contact points with robot
             
-            % x = [q_0, \dot{q}_0, ..., q_T, \dot{q}_T | u_1, ..., u_T | \lambda_1, ..., \lambda_T | h_1, ..., h_T]
-            % where q_i, \dot{q}_i \in \mathbb{R}^{dof}, u_i \in
-            % \mathbb{R}^{dof}, \lambda_i \in \mathbb{R}^{c}, h_i \in
-            % \mathbb{R}
-            % dof = number of degrees of freedom 
-            % c = number of contact points
-            
-            x = zeros(obj.num_states + obj.num_controls + obj.num_lambdas + obj.T, 1);
-            xlow = zeros(obj.num_states + obj.num_controls + obj.num_lambdas + obj.T, 1);
-            xupp = zeros(obj.num_states + obj.num_controls + obj.num_lambdas + obj.T, 1);
+            x_length = obj.num_states + obj.num_controls + obj.num_lambdas + obj.T;
+            x = zeros(x_length, 1);
+            xlow = zeros(x_length, 1);
+            xupp = zeros(x_length, 1);
             
             for t = 0:obj.T
+                % interpolate robot position of each timestep
                 q_interp = obj.lin_interp(obj.q_init(1:obj.arm.dof), obj.q_final(1:obj.arm.dof), t);
                 x = obj.set_q(x, t, q_interp);
                 
@@ -89,7 +103,7 @@ classdef OptProb
                     % Set the torque limits
                     xlow = obj.set_u(xlow, t, obj.arm.u_min);
                     xupp = obj.set_u(xupp, t, obj.arm.u_max);
-                    
+                    % Set the lambda and timestep limits
                     xupp = obj.set_lambda(xupp, t, obj.lambda_max);
                     xlow = obj.set_h(xlow, t, obj.h_min);
                     xupp = obj.set_h(xupp, t, obj.h_max);
@@ -97,10 +111,20 @@ classdef OptProb
             end
             
             function f = func(x)
+                % Generates the constraint vector, F(x).
+                %
+                % Input:    x   - optimization variable 
+                % Output:   f   - constraint vector that contains the
+                %                 objective, kinematic and dynamic 
+                %                 constraints for all timesteps, the phi 
+                %                 (signed-distance to obstacles), the 
+                %                 phi-lambda constraints, and the timestep
+                %                 constraints
+                
                 % compute final cost
                 q_T = obj.get_q(x,obj.T);
                 dq_T = obj.get_dq(x,obj.T);
-                objective = obj.g_f(q_T, dq_T);
+                objective = obj.g_f(q_T, dq_T, obj.arm);
                 
                 % stores q_{t+1} = q_{t} + h * \dot{q}_{t+1}
                 kin_constraints = zeros(obj.arm.dof * obj.T, 1);
@@ -158,27 +182,19 @@ classdef OptProb
                     h_constraints(j) = h1+h2-h3-h4;
                 end
                 
-                [~,target_ee] = obj.arm.fwd_kinematics(obj.q_final);
-                ee_dist = 0;
-                % sum up the cost of the EE deviating from final pose
-                for i=(obj.T-obj.k):obj.T
-                    [~,pos_ee] = obj.arm.fwd_kinematics(obj.get_q(x,i));
-                    ee_dist = ee_dist + norm(target_ee - pos_ee);
-                end
-                
-                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints; ee_dist];
+                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints];
             end
             
             F = @func;
             
-            % objective                 1
-            % kin_constraints           dof * T
-            % dyn_constraints           dof * T
-            % phi_constraints           T * c
-            % phi_lambda_constraints    T
-            % h_constraints             floor((T - 3) / 2)
-            % ee_dist                   1
-            num_constraints = 2 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
+            % Size of the constraint vector: 
+            %   objective                 1
+            %   kin_constraints           dof * T
+            %   dyn_constraints           dof * T
+            %   phi_constraints           T * c
+            %   phi_lambda_constraints    T
+            %   h_constraints             floor((T - 3) / 2)
+            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
             Flow = zeros(num_constraints, 1);
             Fupp = zeros(num_constraints, 1);
             
@@ -186,64 +202,133 @@ classdef OptProb
             Flow(1) = -1000;
             Fupp(1) = 1000;
             
-            % Tolerance on EE dist to final pose
-            Flow(num_constraints) = 0;
-            Fupp(num_constraints) = obj.eps;
-            
             % Upper bound on the signed distance 
             Fupp(1 + 2 * obj.arm.dof * obj.T + 1:1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T) = 50;
         end
         
         function p = lin_interp(obj, p_start, p_end, t)
             % Interpolates a single point at time t
+            %
+            % Input:    p_start     - start point of line
+            %           p_end       - end point of line
+            %           t           - desired interpolation time
+            % Output:   P           - interpolated point at time t
             p = p_start + (t / obj.T) * (p_end - p_start);
         end
         
         function q = get_q(obj, x, t)
+            % Gets the configuration at time t from the optimization variable
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            % Output:   q   - robot configuration at time t
             q = x(2 * obj.arm.dof * t + 1:2 * obj.arm.dof * t + obj.arm.dof);
         end
         
-        function x = set_q(obj, x, t, q)
+        function x = set_q(obj, x, t, q)            
+            % Sets the configuration at time t in vector x
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            %           q   - new configuration 
+            % Output:   x   - updated optimization vector with q_t inside
             x(2 * obj.arm.dof * t + 1:2 * obj.arm.dof * t + obj.arm.dof) = q;
         end
         
         function dq = get_dq(obj, x, t)
+            % Gets the joint velocity at time t from the optimization variable
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            % Output:   dq  - robot joint velocity at time t
             dq = x(2 * obj.arm.dof * t + obj.arm.dof + 1:2 * obj.arm.dof * t + 2 * obj.arm.dof);
         end
         
         function x = set_dq(obj, x, t, dq)
+            % Sets the joint velocity at time t in vector x
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            %           dq  - new joint velocity
+            % Output:   x   - updated optimization vector with dq_t inside
             x(2 * obj.arm.dof * t + obj.arm.dof + 1:2 * obj.arm.dof * t + 2 * obj.arm.dof) = dq;
         end
         
         function u = get_u(obj, x, t)
+            % Gets the control at time t from the optimization variable
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            % Output:   u   - robot control at time t
             u_start = obj.num_states + 1;
             u = x(u_start + obj.arm.dof * (t - 1):u_start + obj.arm.dof * t - 1);
         end
         
         function x = set_u(obj, x, t, u)
+            % Sets the control at time t in vector x
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            %           u   - new control
+            % Output:   x   - updated optimization vector with u_t inside
             u_start = obj.num_states + 1;
             x(u_start + obj.arm.dof * (t - 1):u_start + obj.arm.dof * t - 1) = u;
         end
         
         function lambda = get_lambda(obj, x, t)
+            % Gets the lambda at time t from the optimization variable
+            %
+            % Input:    x       - optimization vector
+            %           t       - time point between [0,...T]
+            % Output:   lambda  - lambda at time t
             lambda_start = obj.num_states + obj.num_controls + 1;
             lambda = x(lambda_start + obj.arm.c * (t - 1):lambda_start + obj.arm.c * t - 1);
         end
         
         function x = set_lambda(obj, x, t, lambda)
+            % Sets the lambda at time t in vector x
+            %
+            % Input:    x       - optimization vector
+            %           t       - time point between [0,...T]
+            %           lambda  - new lambda
+            % Output:   x       - updated optimization vector
             lambda_start = obj.num_states + obj.num_controls + 1;
             x(lambda_start + obj.arm.c * (t - 1):lambda_start + obj.arm.c * t - 1) = lambda;
         end        
         
         function h = get_h(obj, x, t)
+            % Gets the timestep at time t from the optimization variable
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            % Output:   h   - current timestep to take
             h_start = obj.num_states + obj.num_controls + obj.num_lambdas + 1;
             h = x(h_start + t - 1);
         end
         
         function x = set_h(obj, x, t, h)
+            % Sets the timestep h at time t in vector x
+            %
+            % Input:    x   - optimization vector
+            %           t   - time point between [0,...T]
+            %           h   - new timestep
+            % Output:   x   - updated optimization vector with h_t inside
             h_start = obj.num_states + obj.num_controls + obj.num_lambdas + 1;
             x(h_start + t - 1) = h;
         end
+        
+        function traj = get_traj(obj, x)
+            % Extract just the joint angles from optimization variable
+            % 
+            % Input:   x    - optimization vector
+            % Output   traj - configs over time [q_0, q_1, ... , q_T]^T
+            traj = zeros(obj.T + 1, obj.arm.dof);
+            for t = 0:obj.T
+               q = obj.get_q(x, t);
+               traj(t + 1, :) = q';
+            end
+        end
+        
     end
 end
 

@@ -1,39 +1,44 @@
 classdef TwoLinkArm
-    %TWOLINKARM Summary of this class goes here
-    %   Detailed explanation goes here
     
     properties
-        dof % Degrees of freedom
-        c   % Number of contact points
-        m1
+        dof     % Degrees of freedom
+        c       % Number of contact points
+        m1      % Mass of each link
         m2
-        l1
+        l1      % Length of each link
         l2
-        I1x
-        I2x
         g
-        q_min
+        q_min   % Joint limits
         q_max
-        dq_min
+        dq_min  % Velocity limits
         dq_max
-        u_min
+        u_min   % Control torque limits
         u_max
+        alpha   % Constants for equations of motion
+        beta
+        delta
     end
     
     methods
         function obj = TwoLinkArm(dof, c, m1, m2, l1, l2)
-            %TWOLINKARM Construct an instance of this class
-            %   Detailed explanation goes here
+            %TWOLINKARM Constructor. 
+            % Creates a robot arm object with dof degrees of freedom,
+            % c contact points, and desired masses and link lengths
+            %
+            % Inputs:   dof - degrees of freedom (2 for twolinkarm)
+            %           c   - number of contact points
+            %           m1  - mass of link 1 (attached to base)
+            %           m2  - mass of link 2 (attached to link 1)
+            %           l1  - length of link 1
+            %           l2  - length of link 2
+            % Output:   obj - a robot arm object
+            
             obj.dof = dof;
             obj.c = c;
             obj.m1 = m1;
             obj.m2 = m2;
             obj.l1 = l1;
             obj.l2 = l2;
-            
-            % Approximate the links as thin rods
-            obj.I1x = (obj.m1 * obj.l1^2) / 12.0;
-            obj.I2x = (obj.m2 * obj.l2^2) / 12.0;
             
             % Standard acceleration due to gravity
             obj.g = 9.81;
@@ -44,18 +49,78 @@ classdef TwoLinkArm
             obj.dq_max = [20; 20];
             obj.u_min = [-5; -5];
             obj.u_max = [5; 5];
+            
+            % moment of inertia for rod of length l and mass m rotating
+            % about its center
+            Ix1 = (m1*l1^2)/12.0;
+            Ix2 = (m2*l2^2)/12.0;
+
+            % compute constants in the matrix
+            obj.alpha = Ix1 + Ix2 + m1*(l1/2.)^2 + m2*(l1^2 + (l2/2.)^2);
+            obj.beta = m2*l1*(l2/2.);
+            obj.delta = Ix2 + m2*(l2/2.)^2;
+
         end
         
-        function [M, C, N] = dynamics(obj, q, dq)
-            % Returns the manipulator equation matrices
-            %   M(q)*ddq + C(q, dq)*dq + N(q) = u
-            M = two_link_inertia_matrix(obj.I1x, obj.I2x, obj.l1, obj.l2, obj.m1, obj.m2, q(1), q(2));
-            C = two_link_coriolis_matrix(dq(1), dq(2), obj.l1, obj.l2, obj.m2, q(1), q(2));
-            N = two_link_gravity_matrix(obj.g, obj.l1, obj.l2, obj.m1, obj.m2, q(1), q(2));
+        % -------------------- BEGIN DYNAMICS ------------------- %
+        
+        function [M,C,N] = dynamics(obj, q_t1, dq_t1)
+            % Returns equation of motion matrices satisfying 
+            %   M(q_t1)*ddq_t1 + C(q_t1, dq_t1)*dq_t1 + N(q_t1) = u_t1 
+            % 
+            % Inputs:   q_t1 - current joint angles of robot (\in R^{dof})
+            %           dq_t1 - current joint velocity of robot
+            % Outputs:  M   - inertial matrix (\in R^{dof, dof})
+            %           C   - coriolis matrix (\in R^{dof, dof})
+            %           N   - gravity matrix  (\in R^{dof})
+            M = obj.get_M(q_t1);        
+            C = obj.get_C(q_t1, dq_t1); 
+            N = obj.get_N(q_t1);        
         end
         
+        function M = get_M(obj, q_t1)
+            % Computes the inertial matrix at time t for 2-link arm
+            %
+            % Inputs:   q_t1    - configuration of robot
+            % Outputs:  M       - intertial matrix
+            th2 = q_t1(2);
+            M = [obj.alpha + 2*obj.beta*cos(th2) obj.delta + obj.beta*cos(th2);
+                 obj.delta + obj.beta*cos(th2)   obj.delta];
+        end
+
+        function C = get_C(obj, q_t1, dq_t1)
+            %  Computes the coriolis and centrifugal forces acting on the joints
+            %
+            % Inputs:   q_t1    - configuration of robot
+            %           dq_t1   - joint velocities of robot
+            % Outputs:  C       - coriolis matrix
+            dth1 = dq_t1(1);
+            th2 = q_t1(2);
+            dth2 = dq_t1(2);
+
+            C = [-obj.beta*sin(th2)*dth2 -obj.beta*sin(th2)*(dth1+dth2);
+                 obj.beta*sin(th2)*dth1  0];
+        end
+
+        function N = get_N(obj, q_t1)
+            %  Computes the effect of gravity on the links
+            %
+            % Inputs:   q_t1    - configuration of robot
+            % Outputs:  N       - gravity matrix
+            th1 = q_t1(1);
+            th2 = q_t1(2);
+            N = [(obj.m1+obj.m2)*obj.g*obj.l1*cos(th1)+obj.m2*obj.g*obj.l2*cos(th1 + th2);
+                 obj.m2*obj.g*obj.l2*cos(th1 + th2)];
+        end
+        
+        % -------------------- END DYNAMICS ------------------- %
+
         function [pos_elbow, pos_ee] = fwd_kinematics(obj, q_t1)
             % Returns the (x,y) position of elbow and end-effector
+            %
+            % Inputs:   q_t1        - current joint angles of robot
+            % Outputs:  pos_elbow   - (x,y) position of elbow
+            %           pos_ee      - (x,y) position of end-effector
             th1 = q_t1(1);
             th2 = q_t1(2);
             pos_elbow = [obj.l1*cos(th1); obj.l1*sin(th1)];
@@ -63,7 +128,12 @@ classdef TwoLinkArm
         end
         
         function u_c = u_contact(obj, q_t1, lambda_t1)
-            % Computes joint torques as a result of contact forces
+            % Computes joint torques as a result of contact forces by
+            %   F_joints = J^T(q) * F_cartesian
+            % 
+            % Inputs:   q_t1        - current joint angles of robot
+            %           lambda_t1   - magnitude of contact force in y-dir 
+            % Outputs:  u_c     - joint torque as a result of contact force
             J_c = obj.get_elbow_jacobian(q_t1);
             F_c = [0; lambda_t1];
             u_c = J_c' * F_c;
@@ -72,13 +142,22 @@ classdef TwoLinkArm
         function phi = signed_dist(obj, q_t1)
             % Computes signed distance from contact point (elbow) to contact
             % surface (ground-plane)
+            %
+            % Inputs:   q_t1    - current joint angles of robot
+            % Outputs:  phi     - y-dir distance of elbow to ground-plane
             [pos_elbow, ~] = obj.fwd_kinematics(q_t1);
-            % get the y-distance
             phi = pos_elbow(2);
         end
         
         function J_c = get_elbow_jacobian(obj, q_t1)
             % Jacoboian of the elbow of arm
+            %   J(q) = [dx/dq(1) dx/dq(2);
+            %           dy/dq(1) dy/dq(2)]
+            %   x = l1*cos(q(1)) 
+            %   y = l1*sin(q(2))
+            % 
+            % Inputs:   q_t1    - current joint angles of the robot
+            % Outputs:  J_c     - Jacobian of elbow (i.e. contact point) 
             th1 = q_t1(1);
             J_c = [-obj.l1*sin(th1) 0;
                     obj.l1*cos(th1) 0];
@@ -102,16 +181,21 @@ classdef TwoLinkArm
         end
         
         function plot_traj(obj, traj)
+            % Plots the arm following a trajectory
+            %
+            % Inputs:   traj    - sequence of configurations over time [q_0, q_1, ..., q_T]^T
+            % Outputs:  n/a
             clf
-            fig = figure(1);
+            figure(1);
             hold on;
 
             for t = 0:size(traj, 1) - 1
+                % get the current configuration and elbow/ee positions
                 q = traj(t + 1, :)';
 
-                alpha = (t+1)/(size(traj, 1)+1);
+                a = (t+1)/(size(traj, 1)+1);
     
-                obj.plot(q, alpha);
+                obj.plot(q, a);
 
                 axis([-2 2 0 3]);
     
