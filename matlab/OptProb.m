@@ -84,6 +84,7 @@ classdef OptProb
                 x = obj.set_q(x, t, q_interp);
                 
                 % TODO interpolate over joint velocities?
+                % TODO initialize time steps?
                 
                 if t == 0
                     % Constrain the initial joint position and velocity
@@ -144,7 +145,9 @@ classdef OptProb
 
                 for t=0:obj.T-1
                     
-                    h_t1 = obj.get_h(x,t+1);
+%                     h_t1 = obj.get_h(x,t+1);
+                    % DEBUGGING (Ellis) -- fix the time step to 0.1
+                    h_t1 = 0.1;
                     q_t = obj.get_q(x,t);
                     q_t1 = obj.get_q(x,t+1);
                     dq_t = obj.get_dq(x,t);
@@ -159,7 +162,7 @@ classdef OptProb
                     phi = obj.arm.signed_dist(q_t1);
                     
                     % compute running cost
-                    objective = objective + h_t1*obj.g(q_t,dq_t,u_t1);
+                    objective = objective + h_t1*obj.g(q_t,dq_t,u_t1,t+1,obj.T);
                     
                     % compute kinematic and dynamics constraints
                     kin_constraints(obj.arm.dof*t+1 : obj.arm.dof*(t+1)) = q_t - q_t1 + h_t1 * dq_t1;

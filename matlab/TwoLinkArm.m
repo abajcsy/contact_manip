@@ -43,12 +43,12 @@ classdef TwoLinkArm
             % Standard acceleration due to gravity
             obj.g = 9.81;
             
-            obj.q_min = [-pi / 2; -pi / 2];
-            obj.q_max = [pi / 2; pi / 2];
+            obj.q_min = [-pi; -pi];
+            obj.q_max = [pi; pi];
             obj.dq_min = [-20; -20];
             obj.dq_max = [20; 20];
-            obj.u_min = [-5; -5];
-            obj.u_max = [5; 5];
+            obj.u_min = [-10; -10];
+            obj.u_max = [10; 10];
             
             % moment of inertia for rod of length l and mass m rotating
             % about its center
@@ -180,13 +180,13 @@ classdef TwoLinkArm
             scatter(pos_ee(1), pos_ee(2), 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k', 'MarkerFaceAlpha', alpha, 'MarkerEdgeAlpha', alpha);
         end
         
-        function plot_traj(obj, traj)
+        function plot_traj(obj, traj, filename)
             % Plots the arm following a trajectory
             %
             % Inputs:   traj    - sequence of configurations over time [q_0, q_1, ..., q_T]^T
             % Outputs:  n/a
             clf
-            figure(1);
+            fig = figure(1);
             hold on;
 
             for t = 0:size(traj, 1) - 1
@@ -197,10 +197,21 @@ classdef TwoLinkArm
     
                 obj.plot(q, a);
 
-                axis([-2 2 0 3]);
+                axis([-2.5 2.5 -2.5 2.5]);
     
                 set(gca,'YTick',[]);
                 set(gca,'XTick',[]);
+                
+                if ~isempty(filename)
+                    frame = getframe(fig);
+                    im = frame2im(frame);
+                    [imind, cm] = rgb2ind(im, 256); 
+                    if t == 0
+                        imwrite(imind, cm, filename, 'gif', 'Loopcount', inf); 
+                    else
+                        imwrite(imind, cm, filename, 'gif', 'WriteMode', 'append');
+                    end
+                end
     
                 if t ~= size(traj, 1)
                     pause(0.1);
