@@ -10,7 +10,7 @@ F = [0; m*g; 0];
 T = 5;
 dt = 0.001;
 t = 0;
-q_init = [0; 0.5; pi/2]; % x, y, theta
+q_init = [0; 3; pi/2]; % x, y, theta
 dq_init = [0; 0; 0];
 
 q = q_init;
@@ -18,7 +18,9 @@ dq = dq_init;
 
 q_traj = zeros(T/dt, 3);
 
-while t < 10
+fprintf("Simulating for %f s...\n", T);
+
+while t < T
 
     idx = floor(t/dt)+1;
     q_traj(idx,:) = q';
@@ -26,29 +28,44 @@ while t < 10
     theta = q(3);
     dtheta = dq(3);
     
-    A_nu = (1+3*(cos(theta))^2)/m;
-    w_u = (l/2)*(dtheta^2)*sin(theta)-g;
+    A_nu = (1+3*(cos(theta))^2)/m
+    w_u = (l/2)*(dtheta^2)*sin(theta)-g
     
     % x = LCP(M,q) solves the LCP
     % 
     % x >= 0 
     % Mx + q >= 0 
     % x'(Mx + q) = 0
-    lambda = LCP(A_nu, w_u);
+%     lambda = LCP(A_nu, w_u);
+    [w, lambda, retcode] = LCPSolve(A_nu, w_u);
+    w
+    lambda
+    retcode
     
-    gradh = compute_gradh(theta);
-    ddq = M\(gradh*lambda - F);
+%     gradh = compute_gradh(theta);
+%     ddq = M\(gradh*lambda - F);
+
+%     fprintf('--- lambda ---\n');
+%     disp(lambda);
+    ddq = [0; 
+           -g + lambda/m;
+           -(l*cos(theta)*lambda) / (2*I)];
+%     fprintf('--- ddq ---\n');
+%     disp(ddq);
+
     dq = dq + dt * ddq;
     q = q + dt * dq;
     
     t = t + dt;
 end
 
-simulate(q_traj);
+fprintf("Showing trajectory...\n");
+
+simulate(q_traj, dt);
 
 %------------ HELPER FUNCTIONS -----------%
 
-function simulate(q_traj)
+function simulate(q_traj, dt)
     figure(1);
 
     q_curr = q_traj(1,:);
@@ -68,7 +85,7 @@ function simulate(q_traj)
         set(joint1, 'Xdata', p0(1));
         set(joint1, 'Ydata', p0(2));
         
-        pause(0.01);
+        pause(dt);
     end
 
     hold off;            
@@ -85,10 +102,6 @@ end
 
 function gradh = compute_gradh(theta)
     gradh = [0; 1; -(l/2)*cos(theta)];
-end
-
-function dtgradh = compute_dtgradh(theta, dtheta)
-    dtgradh = [0; 0; (l/2)*sin(theta)*dtheta]
 end
 
 end
