@@ -211,21 +211,41 @@ classdef TwoLinkArmWithDoor
             end
         end
         
-        function s = intersect(obj, l1_low, l1_high, l2_low, l2_high)
+        function [s1, s2] = intersection(obj, l1_low, l1_high, l2_low, l2_high)
             % Checks for intersection of line segments (l1_low, l1_high)
-            % and (l2_low, l2_high)
+            %   and (l2_low, l2_high) (some degenerate cases, such as one
+            %   or both of the segments being points, are not handled)
+            %
+            % Inputs: l1_low  - start point of the first line segment
+            %         l1_high - end point of the first line segment
+            %         l2_low  - start point of the second line segment
+            %         l2_high - end point of the second line segment
+            % Outputs: s1 - parameterized point of intersection on the
+            %               first line segment, given by (1 - s1) * l1_low
+            %               + s1 * l1_high
+            %          s2 - parameterized point of intersection on the
+            %               second line segment, given by (1 - s2) * l2_low
+            %               + s2 * l2_high
             delta_l1 = l1_high - l1_low;
             delta_l2 = l2_high - l2_low;
             diff = l1_low - l2_low;
             
             if abs(delta_l1(1) * delta_l2(2) - delta_l1(2) * delta_l2(1)) == 0
                 fprintf("Lines are parallel, no intersection point\n");
-                s = Inf;
+                s1 = Inf;
+                s2 = Inf;
             else
                 s1 = (diff(2) * delta_l2(1) - diff(1) * delta_l2(2)) / (delta_l1(1) * delta_l2(2) - delta_l1(2) * delta_l2(1));
-                s2 = (diff(1) + s1 * delta_l1(1)) / delta_l2(1);
-                fprintf("s1 = %f, s2 = %f\b", s1, s2);
-                s = s1;
+                if abs(delta_l2(1)) > 0
+                    s2 = (diff(1) + s1 * delta_l1(1)) / delta_l2(1);
+                elseif abs(delta_l2(2)) > 0
+                    s2 = (diff(2) + s1 * delta_l1(2)) / delta_l2(2);
+                else
+                    fprintf("Degenerate case?\n");
+                    s2 = Inf;
+                end
+                
+%                 fprintf("s1 = %f, s2 = %f\n", s1, s2);
             end
         end
         

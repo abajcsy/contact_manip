@@ -12,14 +12,17 @@ filename = ''; %strcat(path,'doorsim.gif');
 % arm.simulate(q_init, dq_init, dt, T, filename);
 
 %% Unit test line segment interesection 
-% assert(arm.intersect([0; 0], [1; 0], [0; 1], [1; 1]) == Inf);
-% assert(arm.intersect([-1; 0], [1; 0], [0; -1], [0; 1]) == 0.5);
-% assert(arm.intersect([0; -1], [0; 1], [-1; 0], [1; 0]) == 0.5);
-% assert(arm.intersect([-1; 0], [1; 0], [1; -1], [1; 1]) == 1.0);
-% assert(arm.intersect([1; -1], [1; 1], [-1; 0], [1; 0]) == 1.0);
-% assert(arm.intersect([-1; 0], [1; 0], [-1; -1], [-1; 1]) == 0);
-% assert(arm.intersect([-1; -1], [-1; 1], [-1; 0], [1; 0]) == 0);
-arm.intersect([-1; -1], [-1; 1], [-1; 0], [1; 0])
+[s1, s2] = arm.intersection([0; 0], [1; 0], [0; 1], [1; 1]);
+assert(s1 == Inf && s2 == Inf);
+
+[s1, s2] = arm.intersection([-1; 0], [1; 0], [0; -1], [0; 1]);
+assert(s1 == 0.5 && s2 == 0.5);
+
+[s1, s2] = arm.intersection([-1; 0], [1; 0], [1; -1], [1; 1]);
+assert(s1 == 1 && s2 == 0.5);
+
+[s1, s2] = arm.intersection([-1; 0], [1; 0], [-1; -1], [-1; 1]);
+assert(s1 == 0 && s2 == 0.5);
 
 figure(1);
 hold on;
@@ -34,8 +37,10 @@ for i = 1:1
    plot([l2_low(1) l2_high(1)], [l2_low(2) l2_high(2)], 'g');
    
    fprintf("intersect((%f, %f), (%f, %f), (%f, %f), (%f, %f))?\n", l1_low(1), l1_low(2), l1_high(1), l1_high(2), l2_low(1), l2_low(2), l2_high(1), l2_high(2));
-   s = arm.intersect(l1_low, l1_high, l2_low, l2_high)
+   [s1, s2] = arm.intersection(l1_low, l1_high, l2_low, l2_high);
    
-   p = (1 - s) * l1_low + s * l1_high;
-   scatter(p(1), p(2), 'rx');
+   p1 = (1 - s1) * l1_low + s1 * l1_high;
+   p2 = (1 - s2) * l2_low + s2 * l2_high;
+   scatter(p1(1), p1(2), 'rx');
+   scatter(p2(1), p2(2), 'rx');
 end
