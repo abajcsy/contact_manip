@@ -10,7 +10,7 @@ F = [0; m*g; 0];
 T = 5;
 dt = 0.001;
 t = 0;
-q_init = [0; 3; pi/2]; % x, y, theta
+q_init = [0; 0.5; pi/2 - 0.000001]; % x, y, theta
 dq_init = [0; 0; 0];
 
 q = q_init;
@@ -28,8 +28,8 @@ while t < T
     theta = q(3);
     dtheta = dq(3);
     
-    A_nu = (1+3*(cos(theta))^2)/m
-    w_u = (l/2)*(dtheta^2)*sin(theta)-g
+%     A_nu = (1+3*(cos(theta))^2)/m;
+%     w_u = (l/2)*(dtheta^2)*sin(theta)-g;
     
     % x = LCP(M,q) solves the LCP
     % 
@@ -37,31 +37,53 @@ while t < T
     % Mx + q >= 0 
     % x'(Mx + q) = 0
 %     lambda = LCP(A_nu, w_u);
-    [w, lambda, retcode] = LCPSolve(A_nu, w_u);
-    w
-    lambda
-    retcode
+%     [w, lambda, retcode] = LCPSolve(A_nu, w_u);
+%     w
+%     lambda
+%     retcode
     
 %     gradh = compute_gradh(theta);
 %     ddq = M\(gradh*lambda - F);
 
 %     fprintf('--- lambda ---\n');
 %     disp(lambda);
-    ddq = [0; 
-           -g + lambda/m;
-           -(l*cos(theta)*lambda) / (2*I)];
-%     fprintf('--- ddq ---\n');
-%     disp(ddq);
+%     ddq = [0; 
+%            -g + lambda/m;
+%            -(l*cos(theta)*lambda) / (2*I)];
+    ddq = [0;
+           -g + ((l/2)*dtheta^2*sin(theta)+g) / (1 + 3*cos(theta)^2);
+           -(6/l)*cos(theta)*(((l/2)*dtheta^2*sin(theta)+g) / (1 + 3*cos(theta)^2))];
+    fprintf('--- ddq ---\n');
+    disp(ddq);
 
     dq = dq + dt * ddq;
     q = q + dt * dq;
     
+    if q(3) > pi || q(3) < 0
+        fprintf('breaking out!');
+        break
+    end
+    
     t = t + dt;
 end
 
-fprintf("Showing trajectory...\n");
+
+fprintf("DROP ");
+pause(0.5);
+fprintf("THAT ");
+pause(0.5);
+fprintf("LINK\n");
+pause(0.5);
+% fprintf("!");
+% pause(0.5);
+% fprintf("!");
+% pause(0.5);
+% fprintf("!\n");
+% pause(0.5);
 
 simulate(q_traj, dt);
+
+fprintf("DONE!\n");
 
 %------------ HELPER FUNCTIONS -----------%
 
@@ -76,6 +98,7 @@ function simulate(q_traj, dt)
     [p0, p1, p2] = get_points(q_curr);
     link1 = plot([p1(1) p2(1)], [p1(2) p2(2)], 'k', 'LineWidth', 2);
     joint1 = plot(p0(1), p0(2), 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
+    contact1 = plot(p2(1), p2(2), 'o', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
 
     for t = 1:size(q_traj, 1)
         q_curr = q_traj(t,:);
@@ -84,6 +107,8 @@ function simulate(q_traj, dt)
         set(link1, 'Ydata', [p1(2) p2(2)]);
         set(joint1, 'Xdata', p0(1));
         set(joint1, 'Ydata', p0(2));
+        set(contact1, 'Xdata', p2(1));
+        set(contact1, 'Ydata', p2(2));
         
         pause(dt);
     end
