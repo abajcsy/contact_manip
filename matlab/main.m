@@ -47,43 +47,20 @@ snend;
 
 fprintf('objective value: %d\n', F_opt(1));
 
-% get just the joint angles from the opt variable
+% get components from optimization variable
 traj = optProb.get_traj(x_opt);
+traj_dq = optProb.get_traj_dq(x_opt);
+traj_u = optProb.get_traj_u(x_opt);
+traj_h = optProb.get_traj_h(x_opt);
 
 % plot the arm's trajectory
 arm.plot_traj(traj, 'out.gif');
 
-traj_dq = optProb.get_traj_dq(x_opt);
-traj_u = optProb.get_traj_u(x_opt);
-
-figure(2);
-
-subplot(2, 2, 1);
-plot([1:1:optProb.T]', traj_u(:, 1));
-axis([1 T min(arm.u_min) - 1 max(arm.u_max) + 1]);
-xlabel('time $t$', 'Interpreter', 'latex');
-ylabel('$u_1(t)$', 'Interpreter', 'latex');
-
-subplot(2, 2, 3);
-plot([1:1:optProb.T]', traj_u(:, 2));
-axis([1 T min(arm.u_min) - 1 max(arm.u_max) + 1]);
-xlabel('time $t$', 'Interpreter', 'latex');
-ylabel('$u_2(t)$', 'Interpreter', 'latex');
-
-subplot(2, 2, 2);
-plot([1:1:optProb.T+1]', traj_dq(:, 1));
-axis([1 T min(arm.u_min) - 1 max(arm.u_max) + 1]);
-xlabel('time $t$', 'Interpreter', 'latex');
-ylabel('$\dot{q}_1(t)$', 'Interpreter', 'latex');
-
-subplot(2, 2, 4);
-plot([1:1:optProb.T+1]', traj_dq(:, 2));
-axis([1 T min(arm.u_min) - 1 max(arm.u_max) + 1]);
-xlabel('time $t$', 'Interpreter', 'latex');
-ylabel('$\dot{q}_2(t)$', 'Interpreter', 'latex');
+% plot velocities and controls 
+arm.plot_dq_u(traj_dq, traj_u, T);
 
 for t = 1:optProb.T
-   h = optProb.get_h(x_opt, t);
+   h = traj_h(t);
    lambda = optProb.get_lambda(x_opt, t);
    fprintf('h(%d) = %f, lambda(%d) = %f\n', t, h, t, lambda);
 end

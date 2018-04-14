@@ -43,7 +43,7 @@ classdef TwoLinkArm
             % Standard acceleration due to gravity
             obj.g = 9.81;
             
-            obj.q_min = [-pi; -pi];
+            obj.q_min = [0; -pi];
             obj.q_max = [pi; pi];
             obj.dq_min = [-20; -20];
             obj.dq_max = [20; 20];
@@ -190,6 +190,10 @@ classdef TwoLinkArm
             hold on;
 
             for t = 0:size(traj, 1) - 1
+                                
+                floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+                
                 % get the current configuration and elbow/ee positions
                 q = traj(t + 1, :)';
 
@@ -201,7 +205,7 @@ classdef TwoLinkArm
     
                 set(gca,'YTick',[]);
                 set(gca,'XTick',[]);
-                
+            
                 if ~isempty(filename)
                     frame = getframe(fig);
                     im = frame2im(frame);
@@ -220,7 +224,35 @@ classdef TwoLinkArm
             hold off;
         end
         
-        function simulate(obj, q_init, dq_init, dt, T)
+        function plot_dq_u(obj, traj_dq, traj_u, T)
+            figure(2);
+
+            subplot(2, 2, 1);
+            plot([1:1:T]', traj_u(:, 1));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$u_1(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 3);
+            plot([1:1:T]', traj_u(:, 2));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$u_2(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 2);
+            plot([1:1:T+1]', traj_dq(:, 1));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$\dot{q}_1(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 4);
+            plot([1:1:T+1]', traj_dq(:, 2));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$\dot{q}_2(t)$', 'Interpreter', 'latex');
+        end
+        
+        function simulate_no_contact(obj, q_init, dq_init, dt, T)
             figure(1);
             
             q = q_init;
@@ -244,10 +276,10 @@ classdef TwoLinkArm
             for t = 2:T + 1
                 [M, C, N] = obj.dynamics(q, dq);
                 ddq = M \ (-N - C * dq);
-                dq = dq + dt * ddq;
-                q = q + dt * dq;
+                dq = dq + dt * ddq
+                q = q + dt * dq
 
-                [pos_elbow, pos_ee] = obj.fwd_kinematics(q);
+                [pos_elbow, pos_ee] = obj.fwd_kinematics(q)
                 set(link1, 'Xdata', [p0(1) pos_elbow(1)]);
                 set(link1, 'Ydata', [p0(2) pos_elbow(2)]);
                 set(link2, 'Xdata', [pos_elbow(1) pos_ee(1)]);
@@ -262,6 +294,45 @@ classdef TwoLinkArm
 
             hold off;            
         end
+        
+
+        %------------ HELPER FUNCTIONS -----------%
+
+        function fwd_simulate(obj, q_traj, dt)
+            figure(1);
+
+            q_curr = q_traj(1,:);
+
+            hold on;
+            axis([-3 3 -3 3]);
+
+            p0 = [0 0];
+            [pos_elbow, pos_ee] = obj.fwd_kinematics(q_curr);
+
+            link1 = plot([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'k');
+            link2 = plot([pos_elbow(1) pos_ee(1)], [pos_elbow(2) pos_ee(2)], 'k');
+            joint1 = scatter([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
+            joint2 = scatter(pos_ee(1), pos_ee(2), 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k');
+
+            for t = 1:size(q_traj, 1)
+                q_curr = q_traj(t,:);
+                [pos_elbow, pos_ee] = obj.fwd_kinematics(q_curr);
+                set(link1, 'Xdata', [p0(1) pos_elbow(1)]);
+                set(link1, 'Ydata', [p0(2) pos_elbow(2)]);
+                set(link2, 'Xdata', [pos_elbow(1) pos_ee(1)]);
+                set(link2, 'Ydata',  [pos_elbow(2) pos_ee(2)]);
+                set(joint1, 'Xdata', [p0(1) pos_elbow(1)]);
+                set(joint1, 'Ydata', [p0(2) pos_elbow(2)]);
+                set(joint2, 'Xdata', pos_ee(1));
+                set(joint2, 'Ydata', pos_ee(2));
+
+                pause(dt);
+            end
+
+            hold off;            
+        end
+        
     end
 end
+
 

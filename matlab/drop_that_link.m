@@ -1,22 +1,23 @@
 function drop_that_link()
+% m*ddx     = 0
+% m*ddy     = -m*g + lambda
+% I*ddtheta = -(l/2)*cos(theta)*lambda
 
 l = 1.0;
 m = 0.1;
 g = 9.81;
 I = (m*l^2)/12.0;
 
-M = [m 0 0; 0 m 0; 0 0 I];
-F = [0; m*g; 0];
-T = 5;
+
+T = 10;
 dt = 0.001;
 t = 0;
-q_init = [0; 0.5; pi/2 - 0.000001]; % x, y, theta
-dq_init = [0; 0; 0];
 
+q_init = [0; 1; pi/6; 0; 0; 0]; % x, y, theta, dx, dy, dtheta
 q = q_init;
-dq = dq_init;
 
-q_traj = zeros(T/dt, 3);
+q_traj = zeros(T/dt, 6);
+lambda_traj = zeros(T/dt, 1);
 
 fprintf("Simulating for %f s...\n", T);
 
@@ -25,39 +26,42 @@ while t < T
     idx = floor(t/dt)+1;
     q_traj(idx,:) = q';
     
+    % positions
+    x = q(1);
+    y = q(2);
     theta = q(3);
-    dtheta = dq(3);
     
-%     A_nu = (1+3*(cos(theta))^2)/m;
-%     w_u = (l/2)*(dtheta^2)*sin(theta)-g;
+    % velocities
+    dx = q(4);
+    dy = q(5);
+    dtheta = q(6);
     
+    A = dt^2/m; %- (l/2)*sin(theta + dt*dtheta - ((dt^2*l)/2*I)*cos(theta)*lambda);
+    b = y + dt*dy - dt^2*g;
+
     % x = LCP(M,q) solves the LCP
     % 
     % x >= 0 
     % Mx + q >= 0 
     % x'(Mx + q) = 0
-%     lambda = LCP(A_nu, w_u);
-%     [w, lambda, retcode] = LCPSolve(A_nu, w_u);
-%     w
-%     lambda
-%     retcode
+    [w, lambda, retcode] = LCPSolve(A, b);
+    lambda
+    lambda_traj(idx,1) = lambda; 
     
-%     gradh = compute_gradh(theta);
-%     ddq = M\(gradh*lambda - F);
-
-%     fprintf('--- lambda ---\n');
-%     disp(lambda);
-%     ddq = [0; 
-%            -g + lambda/m;
-%            -(l*cos(theta)*lambda) / (2*I)];
-    ddq = [0;
-           -g + ((l/2)*dtheta^2*sin(theta)+g) / (1 + 3*cos(theta)^2);
-           -(6/l)*cos(theta)*(((l/2)*dtheta^2*sin(theta)+g) / (1 + 3*cos(theta)^2))];
-    fprintf('--- ddq ---\n');
-    disp(ddq);
-
-    dq = dq + dt * ddq;
-    q = q + dt * dq;
+    % update x
+    x = x + dt*dx;
+    
+    % update y, dx
+    ddy = -g + lambda/m;    
+    dy = dy + dt * ddy;
+    y = y + dt * dy;
+    
+    % update theta, dtheta
+    ddtheta = -(l/(2*I))*cos(theta)*lambda;
+    dtheta = dtheta + dt * ddtheta;
+    theta = theta + dt * dtheta;
+    
+    q = [x; y; theta; dx; dy; dtheta];
     
     if q(3) > pi || q(3) < 0
         fprintf('breaking out!');
@@ -81,27 +85,39 @@ pause(0.5);
 % fprintf("!\n");
 % pause(0.5);
 
-simulate(q_traj, dt);
+simulate(q_traj, lambda_traj, dt);
 
 fprintf("DONE!\n");
 
 %------------ HELPER FUNCTIONS -----------%
 
-function simulate(q_traj, dt)
+function simulate(q_traj, lambda_traj, dt)
     figure(1);
 
     q_curr = q_traj(1,:);
+    lamb_curr = lambda_traj(1,1);
 
     hold on;
-    axis([-3 3 -1 5]);
+    axis([-3 3 -3 3]);
     
     [p0, p1, p2] = get_points(q_curr);
     link1 = plot([p1(1) p2(1)], [p1(2) p2(2)], 'k', 'LineWidth', 2);
     joint1 = plot(p0(1), p0(2), 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
     contact1 = plot(p2(1), p2(2), 'o', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b');
 
-    for t = 1:size(q_traj, 1)
+    dir = 0;
+    len = lamb_curr;
+    q = quiver(0,0,dir,len);
+    set(q,'LineWidth',1);
+    
+    time = 0;
+    h = text(1.1,1.8,strcat('t=',num2str(time)));
+    la = text(1.1,1.6,strcat('lambda=',num2str(lamb_curr)));
+    
+	for t = 1:size(q_traj, 1)
         q_curr = q_traj(t,:);
+        lamb_curr = lambda_traj(t,1);
+        
         [p0, p1, p2] = get_points(q_curr);
         set(link1, 'Xdata', [p1(1) p2(1)]);
         set(link1, 'Ydata', [p1(2) p2(2)]);
@@ -110,7 +126,16 @@ function simulate(q_traj, dt)
         set(contact1, 'Xdata', p2(1));
         set(contact1, 'Ydata', p2(2));
         
+        set(h, 'String', strcat('t=',num2str(time)));
+        set(la, 'String', strcat('lambda=',num2str(lamb_curr)));
+        
+        if lamb_curr ~= 0
+            set(q, 'Vdata', lamb_curr);
+            set(q, 'Color', 'red');
+        end
+        
         pause(dt);
+        time = time + dt;
     end
 
     hold off;            
@@ -129,4 +154,7 @@ function gradh = compute_gradh(theta)
     gradh = [0; 1; -(l/2)*cos(theta)];
 end
 
+function dtgradh = compute_dtgradh(theta, dtheta)
+    dtgradh = [0; 0; (l/2)*sin(theta)*dtheta];
+end
 end

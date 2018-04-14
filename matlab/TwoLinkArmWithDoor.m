@@ -21,7 +21,7 @@ classdef TwoLinkArmWithDoor
         delta
         I_door  % Moment of inertia of the door
         damping % Damping coefficient of door
-        door_center
+        door_hinge 
     end
     
     methods
@@ -40,10 +40,10 @@ classdef TwoLinkArmWithDoor
             % Standard acceleration due to gravity
             obj.g = 9.81;
             
-            obj.q_min = [0; -pi / 2];
-            obj.q_max = [pi; pi / 2];
-            obj.dq_min = [-20; -20];
-            obj.dq_max = [20; 20];
+            obj.q_min = [0; -pi / 2; -pi];
+            obj.q_max = [pi; pi / 2; 0];
+            obj.dq_min = [-1; -1; -1];
+            obj.dq_max = [1; 1; 1];
             obj.u_min = [-5; -5];
             obj.u_max = [5; 5];
             
@@ -60,7 +60,7 @@ classdef TwoLinkArmWithDoor
             obj.I_door = (m3*l3^2)/12.0;
             obj.damping = 2.0;
             
-            obj.door_center = [-l1/2.0; l1+l2+l3/2.0];
+            obj.door_hinge = [-l1/2.0; l1+l2+l3/2.0];
         end
         
         % -------------------- BEGIN DYNAMICS ------------------- %
@@ -102,7 +102,7 @@ classdef TwoLinkArmWithDoor
 
             C = [-obj.beta*sin(th2)*dth2 -obj.beta*sin(th2)*(dth1+dth2) 0;
                  obj.beta*sin(th2)*dth1  0 0;
-                 0 0 obj.damping];
+                 0 0 -obj.damping];
         end
 
         function N = get_N(obj, q_t1)
@@ -135,7 +135,7 @@ classdef TwoLinkArmWithDoor
             % Returns (x,y) position of the door.
             
             th3 = q_t1;
-            pos_door = obj.door_center + [obj.l2*cos(th3); obj.l1*sin(th3)];
+            pos_door = obj.door_hinge + [obj.l3*cos(th3); obj.l3*sin(th3)];
         end
        
         function J_c = get_elbow_jacobian(obj, q_t1)
@@ -152,19 +152,81 @@ classdef TwoLinkArmWithDoor
                     obj.l1*cos(th1) 0];
         end
         
+        function door_contact_vec = get_contact_vec(obj, th3)
+            door_contact_vec = [(obj.l3/2)*cos(th3); (obj.l3/2)*sin(th3)];
+        end
+        
         function u_c = u_contact(obj, q_t1, lambda_t1)
-            % TODO IMPLEMENT ME
+            % Computes joint torques as a result of contact forces by
+            %   F_joints = J^T(q) * lambda_dor
+            % 
+            % Inputs:   q_t1        - current joint angles of robot
+            %           lambda_t1   - magnitude of contact force in y-dir 
+            % Outputs:  u_c     - joint torque as a result of contact force
+            J_c = obj.get_elbow_jacobian(q_t1);
+            th3 = q_t1(3);
+            F_c = [-lambda_t1*sin(th3); lambda_t1*cos(th3)];
+            u_r = J_c' * F_c; % joint torques experienced by robot
+            
+            F_door = [lambda_t1*sin(th3); -lambda_t1*cos(th3)];
+            door_contact_vec = obj.get_contact_vec(th3);
+            u_d = norm(cross(F_door, door_contact_vec)); % joint torques experienced by door
+            u_c = [u_r; u_d];
         end
         
         function phi = signed_dist(obj, q_t1)
-            % TODO IMPLEMENT ME
-            % TODO This is wrong -- needs to account for door intersection
-            %   with the two links in addition to distance from elbow to
-            %   contact point
-            [pos_elbow, ~] = obj.fwd_kinematics(q_t1(1:2));
-            pos_door = obj.fwd_kin_dor(q_t1(3));
-            pos_door_center = [pos_door(1)/2. pos_door(2)/2.];
-            phi = norm(pos_elbow - pos_door_center);
+            % TODO DESCRIBE HOW THIS WORKS
+            pos_base = [0; 0];
+            [pos_elbow, pos_ee] = obj.fwd_kinematics(q_t1(1:2));
+            pos_door_hinge = obj.door_hinge;
+            pos_door_tip = obj.fwd_kin_door(q_t1);
+            
+            % intersection between door and link 1
+            s1 = obj.intersect(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
+             % intersection between door and link 2
+            s2 = obj.intersect(pos_elbow, pos_ee, pos_door_hinge, pos_door_tip);
+            
+            % link 1 intersects
+            if s1 < 1 && s1 > 0
+                phi = -1;
+            elseif s1 == 1 % at elbow
+                phi = 0;
+            elseif s1 == 0 % at base
+                phi = 1;
+            else % not intersecting
+                phi = 1;
+            end
+            
+            if phi >= 0
+                % link 2 intersects
+                if s2 < 1 && s2 > 0
+                    phi = -1;
+                elseif s2 == 0 % at elbow
+                    phi = 0;
+                elseif s2 == 1 % at ee
+                    phi = 1;
+                else % not intersecting
+                    phi = 1;
+                end
+            end
+        end
+        
+        function s = intersect(obj, l1_low, l1_high, l2_low, l2_high)
+            % Checks for intersection of line segments (l1_low, l1_high)
+            % and (l2_low, l2_high)
+            delta_l1 = l1_high - l1_low;
+            delta_l2 = l2_high - l2_low;
+            diff = l1_low - l2_low;
+            
+            if abs(delta_l1(1) * delta_l2(2) - delta_l1(2) * delta_l2(1)) == 0
+                fprintf("Lines are parallel, no intersection point\n");
+                s = Inf;
+            else
+                s1 = (diff(2) * delta_l2(1) - diff(1) * delta_l2(2)) / (delta_l1(1) * delta_l2(2) - delta_l1(2) * delta_l2(1));
+                s2 = (diff(1) + s1 * delta_l1(1)) / delta_l2(1);
+                fprintf("s1 = %f, s2 = %f\b", s1, s2);
+                s = s1;
+            end
         end
         
         function simulate(obj, q_init, dq_init, dt, T, filename)
@@ -184,9 +246,12 @@ classdef TwoLinkArmWithDoor
             pos_door = obj.fwd_kin_door(q(3));
 
             p0 = [0; 0];
-            p0_door = obj.door_center;
+            p0_door = obj.door_hinge;
             
-            ceiling = rectangle('Position',[-3 obj.door_center(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+            ceiling = rectangle('Position',[-3 obj.door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+            
+             floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
                 'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
             
             link1 = plot([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'k');
