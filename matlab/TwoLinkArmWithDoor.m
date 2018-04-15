@@ -102,7 +102,7 @@ classdef TwoLinkArmWithDoor
 
             C = [-obj.beta*sin(th2)*dth2 -obj.beta*sin(th2)*(dth1+dth2) 0;
                  obj.beta*sin(th2)*dth1  0 0;
-                 0 0 -obj.damping];
+                 0 0 obj.damping];
         end
 
         function N = get_N(obj, q_t1)
@@ -271,7 +271,7 @@ classdef TwoLinkArmWithDoor
             ceiling = rectangle('Position',[-3 obj.door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
                 'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
             
-             floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+            floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
                 'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
             
             link1 = plot([p0(1) pos_elbow(1)], [p0(2) pos_elbow(2)], 'k');
@@ -280,19 +280,28 @@ classdef TwoLinkArmWithDoor
             joint1 = scatter([p0(1) p0_door(1) pos_elbow(1)], [p0(2) p0_door(2) pos_elbow(2)], 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
             joint2 = scatter([pos_door(1) pos_ee(1)], [pos_door(2) pos_ee(2)], 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k');
             
-            force_counter = 0;
+%             force_counter = 0;
             for t = 2:T + 1
                 [M, C, N] = obj.dynamics(q, dq);
                 % simulate constant force on the door
-                if force_counter < 50
-                    u = [0; 0; -2];
-                elseif force_counter > 100 && force_counter < 160
-                    u = [0;0;5];
-                else
-                    u = [0;0;0];
-                end
-                force_counter = force_counter + 1;
-                ddq = M \ (u -N - C * dq);
+%                 if force_counter < 50
+%                     u = [0; 0; -2];
+%                 elseif force_counter > 100 && force_counter < 160
+%                     u = [0;0;5];
+%                 else
+%                     u = [0;0;0];
+%                 end
+%                 force_counter = force_counter + 1;
+                u = [0; 0; 0];
+                
+                fprintf("----- M: \n");
+                disp(M);
+                fprintf("----- q: \n");
+                disp(q);
+                fprintf("----- dq: \n");
+                disp(dq);
+                
+                ddq = M \ (u - N - C * dq);
                 dq = dq + dt * ddq;
                 q = q + dt * dq;
 
