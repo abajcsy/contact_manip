@@ -181,34 +181,14 @@ classdef TwoLinkArmWithDoor
             pos_door_hinge = obj.door_hinge;
             pos_door_tip = obj.fwd_kin_door(q_t1);
             
-            % intersection between door and link 1
-            s1 = obj.intersect(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
-             % intersection between door and link 2
-            s2 = obj.intersect(pos_elbow, pos_ee, pos_door_hinge, pos_door_tip);
+            % Compute intersection between link 1 and the door
+            [link1_w_door_s1, link1_w_door_s2] = obj.intersection(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
+            % Compute intersection between link 2 and the door
+            [link2_w_door_s1, link2_w_door_s2] = obj.intersection(pos_elbow, pos_ee, pos_door_hinge, pos_door_tip);
             
-            % link 1 intersects
-            if s1 < 1 && s1 > 0
-                phi = -1;
-            elseif s1 == 1 % at elbow
-                phi = 0;
-            elseif s1 == 0 % at base
-                phi = 1;
-            else % not intersecting
-                phi = 1;
-            end
             
-            if phi >= 0
-                % link 2 intersects
-                if s2 < 1 && s2 > 0
-                    phi = -1;
-                elseif s2 == 0 % at elbow
-                    phi = 0;
-                elseif s2 == 1 % at ee
-                    phi = 1;
-                else % not intersecting
-                    phi = 1;
-                end
-            end
+            
+            phi = 0;
         end
         
         function [s1, s2] = intersection(obj, l1_low, l1_high, l2_low, l2_high)
@@ -337,6 +317,56 @@ classdef TwoLinkArmWithDoor
             hold off;            
         end
         
+        function show_state_debug(obj, q, fig)
+            % TODO function should display state of the robot and door,
+            % with collision 
+            figure(fig);
+            
+            hold on;
+
+            axis([-3 3 -3 3]);
+
+            set(gca,'YTick',[]);
+            set(gca,'XTick',[]);
+            
+            pos_base = [0; 0];
+            [pos_elbow, pos_ee] = obj.fwd_kinematics(q(1:2));
+            pos_door_hinge = obj.door_hinge;
+            pos_door_tip = obj.fwd_kin_door(q(3));
+            
+            % Compute intersection between link 1 and the door
+            [link1_w_door_s1, link1_w_door_s2] = obj.intersection(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
+            % Compute intersection between link 2 and the door
+            [link2_w_door_s1, link2_w_door_s2] = obj.intersection(pos_elbow, pos_ee, pos_door_hinge, pos_door_tip);
+            
+            % TODO handle parallel case
+            
+            % Check if link 1 intersects the door
+            p1 = (1 - link1_w_door_s1) * pos_base + link1_w_door_s1 * pos_elbow;
+            if 0 <= link1_w_door_s1 && link1_w_door_s1 <= 1 && 0 <= link1_w_door_s2 && link1_w_door_s2 <= 1
+                fprintf('Link 1 intersects with door!\n');
+                scatter(p1(1), p1(2), 'rx');
+            end
+            
+            % Check if link 2 intersects the door
+            p2 = (1 - link2_w_door_s1) * pos_elbow + link2_w_door_s1 * pos_ee;
+            if 0 <= link2_w_door_s1 && link2_w_door_s1 <= 1 && 0 <= link2_w_door_s2 && link2_w_door_s2 <= 1
+                fprintf('Link 2 intersects with door!\n');
+                scatter(p2(1), p2(2), 'rx');
+            end
+            
+            ceiling = rectangle('Position',[-3 pos_door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+            
+            floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+            
+            link1 = plot([pos_base(1) pos_elbow(1)], [pos_base(2) pos_elbow(2)], 'k');
+            link2 = plot([pos_elbow(1) pos_ee(1)], [pos_elbow(2) pos_ee(2)], 'k');
+            link3 = plot([pos_door_hinge(1) pos_door_tip(1)], [pos_door_hinge(2) pos_door_tip(2)], 'k');
+            joint1 = scatter([pos_base(1) pos_door_hinge(1) pos_elbow(1)], [pos_base(2) pos_door_hinge(2) pos_elbow(2)], 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
+            joint2 = scatter([pos_door_tip(1) pos_ee(1)], [pos_door_tip(2) pos_ee(2)], 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k');
+        end
         
     end
 end

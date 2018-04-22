@@ -1,4 +1,4 @@
-arm = TwoLinkArmWithDoor(2, 1, 1, 1, 1, 1, 1, 1);
+arm = TwoLinkArmWithDoor(2, 1, 1, 1, 1, 1, 1, 2);
 
 %% Unit test the arm and door dynamics
 q_init = [pi / 2; pi / 2; -pi / 2];
@@ -9,7 +9,7 @@ T = 5000;
 %path = '/home/abajcsy/hybrid_ws/src/contact_manip/matlab/';
 filename = ''; %strcat(path,'doorsim.gif');
 
-arm.simulate(q_init, dq_init, dt, T, filename);
+% arm.simulate(q_init, dq_init, dt, T, filename);
 
 %% Unit test line segment interesection 
 [s1, s2] = arm.intersection([0; 0], [1; 0], [0; 1], [1; 1]);
@@ -44,3 +44,10 @@ for i = 1:1
    scatter(p1(1), p1(2), 'rx');
    scatter(p2(1), p2(2), 'rx');
 end
+
+%% Unit test for the signed distance function
+q = [pi/2 + 0.1; -pi/8; -2*pi/5];
+arm.show_state_debug(q, 2);
+
+q = [pi/2; 0; -pi/2];
+arm.show_state_debug(q, 3);
