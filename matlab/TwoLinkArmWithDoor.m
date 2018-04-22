@@ -174,21 +174,34 @@ classdef TwoLinkArmWithDoor
             u_c = [u_r; u_d];
         end
         
-        function phi = signed_dist(obj, q_t1)
-            % TODO DESCRIBE HOW THIS WORKS
+        function dist_link_door = signed_dist_contact(obj, q)
+            % Returns signed distance between the first link (which is
+            %   allowed to make contact) and the door
+            [pos_elbow, ~] = obj.fwd_kinematics(q);
             pos_base = [0; 0];
-            [pos_elbow, pos_ee] = obj.fwd_kinematics(q_t1(1:2));
-            pos_door_hinge = obj.door_hinge;
-            pos_door_tip = obj.fwd_kin_door(q_t1);
-            
+            pos_door_tip = obj.fwd_kin_door(q(3));
             % Compute intersection between link 1 and the door
-            [link1_w_door_s1, link1_w_door_s2] = obj.intersection(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
-            % Compute intersection between link 2 and the door
-            [link2_w_door_s1, link2_w_door_s2] = obj.intersection(pos_elbow, pos_ee, pos_door_hinge, pos_door_tip);
+            [s1, s2] = obj.intersection(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
+            dist_link_door = max(abs(s1 - 0.5) - 0.5, abs(s2 - 0.5) - 0.5);
+        end
+        
+        function [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = signed_dist_no_contact(obj, q)
+            % Returns signed distances from the floor and ceiling planes to
+            %   the elbow and the end effector, and the signed distance
+            %   between door and the second link of the arm (which is not
+            %   allowed to make contact)
+            [pos_elbow, pos_ee] = obj.fwd_kinematics(q);
             
+            dist_floor_elbow = pos_elbow(2);
+            dist_floor_ee = pos_ee(2);
             
+            ceil_y = obj.door_hinge(2);
+            dist_ceil_elbow = ceil_y - pos_elbow(2);
+            dist_ceil_ee = ceil_y - pos_elbow(2);
             
-            phi = 0;
+            pos_door_tip = obj.fwd_kin_door(q(3));
+            [link_w_door_s1, link_w_door_s2] = obj.intersection(pos_elbow, pos_ee, obj.door_hinge, pos_door_tip);
+            dist_link_door = max(abs(link_w_door_s1 - 0.5) - 0.5, abs(link_w_door_s2 - 0.5) - 0.5);
         end
         
         function [s1, s2] = intersection(obj, l1_low, l1_high, l2_low, l2_high)
@@ -354,6 +367,15 @@ classdef TwoLinkArmWithDoor
                 fprintf('Link 2 intersects with door!\n');
                 scatter(p2(1), p2(2), 'rx');
             end
+            
+            % Compute signed distance functions
+            fprintf('%%%% signed distances no contact %%%%\n');
+            [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = obj.signed_dist_no_contact(q);
+            fprintf('\tdist floor to elbow:\t%f\n', dist_floor_elbow);
+            fprintf('\tdist ceil to elbow:\t%f\n', dist_ceil_elbow);
+            fprintf('\tdist floor to ee:\t%f\n', dist_floor_ee);
+            fprintf('\tdist ceil to ee:\t%f\n', dist_ceil_ee);
+            fprintf('\tdist link2 to door:\t%f\n', dist_link_door);
             
             ceiling = rectangle('Position',[-3 pos_door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
                 'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
