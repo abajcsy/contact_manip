@@ -44,8 +44,8 @@ classdef TwoLinkArmWithDoor
             obj.q_max = [pi; pi / 2; 0];
             obj.dq_min = [-1; -1; -1];
             obj.dq_max = [1; 1; 1];
-            obj.u_min = [-5; -5];
-            obj.u_max = [5; 5];
+            obj.u_min = [-5; -5; 0];
+            obj.u_max = [5; 5; 0];
             
             % moment of inertia for rod of length l and mass m rotating
             % about its center
@@ -153,7 +153,7 @@ classdef TwoLinkArmWithDoor
         end
         
         function door_contact_vec = get_contact_vec(obj, th3)
-            door_contact_vec = [(obj.l3/2)*cos(th3); (obj.l3/2)*sin(th3)];
+            door_contact_vec = [(obj.l3/2)*cos(th3); (obj.l3/2)*sin(th3); 0];
         end
         
         function u_c = u_contact(obj, q_t1, lambda_t1)
@@ -168,7 +168,7 @@ classdef TwoLinkArmWithDoor
             F_c = [-lambda_t1*sin(th3); lambda_t1*cos(th3)];
             u_r = J_c' * F_c; % joint torques experienced by robot
             
-            F_door = [lambda_t1*sin(th3); -lambda_t1*cos(th3)];
+            F_door = [lambda_t1*sin(th3); -lambda_t1*cos(th3); 0];
             door_contact_vec = obj.get_contact_vec(th3);
             u_d = norm(cross(F_door, door_contact_vec)); % joint torques experienced by door
             u_c = [u_r; u_d];
@@ -181,11 +181,12 @@ classdef TwoLinkArmWithDoor
             pos_base = [0; 0];
             pos_door_tip = obj.fwd_kin_door(q(3));
             % Compute intersection between link 1 and the door
-            [s1, s2] = obj.intersection(pos_base, pos_elbow, pos_door_hinge, pos_door_tip);
-            dist_link_door = max(abs(s1 - 0.5) - 0.5, abs(s2 - 0.5) - 0.5);
+            [s1, s2] = obj.intersection(pos_base, pos_elbow, obj.door_hinge, pos_door_tip);
+            % TODO (Ellis) make max signed distance a parameter
+            dist_link_door = max([abs(s1 - 0.5) - 0.5, abs(s2 - 0.5) - 0.5, 500]);
         end
         
-        function [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = signed_dist_no_contact(obj, q)
+        function [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = signed_dist_no_contact_separate(obj, q)
             % Returns signed distances from the floor and ceiling planes to
             %   the elbow and the end effector, and the signed distance
             %   between door and the second link of the arm (which is not
@@ -201,7 +202,19 @@ classdef TwoLinkArmWithDoor
             
             pos_door_tip = obj.fwd_kin_door(q(3));
             [link_w_door_s1, link_w_door_s2] = obj.intersection(pos_elbow, pos_ee, obj.door_hinge, pos_door_tip);
-            dist_link_door = max(abs(link_w_door_s1 - 0.5) - 0.5, abs(link_w_door_s2 - 0.5) - 0.5);
+            if link_w_door_s1 == Inf || link_w_door_s2 == Inf
+                % TODO should set to some large value that is still within
+                % the variable bounds for the optimization problem
+                dist_link_door = 500;
+            else
+                dist_link_door = max(abs(link_w_door_s1 - 0.5) - 0.5, abs(link_w_door_s2 - 0.5) - 0.5);
+            end
+        end
+        
+        function dist = signed_dist_no_contact(obj, q)
+            [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = obj.signed_dist_no_contact_separate(q);
+            % TODO (Ellis) make max signed distance a parameter
+            dist = min([dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door, 500]);
         end
         
         function [s1, s2] = intersection(obj, l1_low, l1_high, l2_low, l2_high)
@@ -370,12 +383,16 @@ classdef TwoLinkArmWithDoor
             
             % Compute signed distance functions
             fprintf('%%%% signed distances no contact %%%%\n');
-            [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = obj.signed_dist_no_contact(q);
+            [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = obj.signed_dist_no_contact_separate(q);
             fprintf('\tdist floor to elbow:\t%f\n', dist_floor_elbow);
             fprintf('\tdist ceil to elbow:\t%f\n', dist_ceil_elbow);
             fprintf('\tdist floor to ee:\t%f\n', dist_floor_ee);
             fprintf('\tdist ceil to ee:\t%f\n', dist_ceil_ee);
             fprintf('\tdist link2 to door:\t%f\n', dist_link_door);
+            fprintf('\tmin dist:\t\t%f\n', obj.signed_dist_no_contact(q));
+            fprintf('%%%% signed distance contact %%%%\n');
+            dist_door = obj.signed_dist_contact(q);
+            fprintf('\tdist elbow to door:\t%f\n', dist_door);
             
             ceiling = rectangle('Position',[-3 pos_door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
                 'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);

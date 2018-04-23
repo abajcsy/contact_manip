@@ -1,4 +1,4 @@
-%% Trajectory Optimization with Contact
+%% Trajectory Optimization with Contact (2 Link Arm)
 
 % setup the robot arm parameters
 dof = 2;

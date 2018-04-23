@@ -139,14 +139,18 @@ classdef TwoLinkArm
             u_c = J_c' * F_c;
         end
         
-        function phi = signed_dist(obj, q_t1)
+        function phi = signed_dist_contact(obj, q)
             % Computes signed distance from contact point (elbow) to contact
             % surface (ground-plane)
             %
-            % Inputs:   q_t1    - current joint angles of robot
+            % Inputs:   q       - current joint angles of robot
             % Outputs:  phi     - y-dir distance of elbow to ground-plane
-            [pos_elbow, ~] = obj.fwd_kinematics(q_t1);
+            [pos_elbow, ~] = obj.fwd_kinematics(q);
             phi = pos_elbow(2);
+        end
+        
+        function phi = signed_dist_no_contact(obj, q)
+            phi = 0;
         end
         
         function J_c = get_elbow_jacobian(obj, q_t1)

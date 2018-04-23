@@ -142,9 +142,12 @@ classdef OptProb
                 % enforce that h_{t-1} + h_{t} = h_{t+1} + h_{t+2}
                 num_h_constraints = floor((obj.T-3)/2);
                 h_constraints = zeros(num_h_constraints, 1);
+                
+                % enforce that the signed distance to non-contact objects
+                % is greater than or equal to zero
+                phi_no_contact_constraints = zeros(obj.T, 1);
 
                 for t=0:obj.T-1
-                    
 %                     h_t1 = obj.get_h(x,t+1);
                     % DEBUGGING (Ellis) -- fix the time step to 0.1
                     h_t1 = 0.1;
@@ -159,7 +162,7 @@ classdef OptProb
                     [M,C,N] = obj.arm.dynamics(q_t1,dq_t1);
                     u_contact = obj.arm.u_contact(q_t1,lambda_t1);
                     
-                    phi = obj.arm.signed_dist(q_t1);
+                    phi = obj.arm.signed_dist_contact(q_t1);
                     
                     % compute running cost
                     objective = objective + h_t1*obj.g(q_t,dq_t,u_t1,t+1,obj.T);
@@ -173,6 +176,9 @@ classdef OptProb
                     % TODO If c > 1 this indexing will not work!
                     phi_constraints(t+1) = phi;
                     phi_lambda_constraints(t+1) = phi' * lambda_t1;
+                    
+                    phi_no_contact = obj.arm.signed_dist_no_contact(q_t1);
+                    phi_no_contact_constraints(t+1) = phi_no_contact;
                 end
                 
                 % compute all pairwise h constraints
@@ -185,19 +191,20 @@ classdef OptProb
                     h_constraints(j) = h1+h2-h3-h4;
                 end
                 
-                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints];
+                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints; phi_no_contact_constraints];
             end
             
             F = @func;
             
             % Size of the constraint vector: 
-            %   objective                 1
-            %   kin_constraints           dof * T
-            %   dyn_constraints           dof * T
-            %   phi_constraints           T * c
-            %   phi_lambda_constraints    T
-            %   h_constraints             floor((T - 3) / 2)
-            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
+            %   objective                  1
+            %   kin_constraints            dof * T
+            %   dyn_constraints            dof * T
+            %   phi_constraints            T * c
+            %   phi_lambda_constraints     T
+            %   h_constraints              floor((T - 3) / 2)
+            %   phi_no_contact_constraints T
+            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2) + obj.T;
             Flow = zeros(num_constraints, 1);
             Fupp = zeros(num_constraints, 1);
             
@@ -206,7 +213,15 @@ classdef OptProb
             Fupp(1) = 1000;
             
             % Upper bound on the signed distance 
-            Fupp(1 + 2 * obj.arm.dof * obj.T + 1:1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T) = 50;
+            % TODO (Ellis) -- make upper bound on signed distance a
+            % parameter, and make sure it doesn't get too large
+%             Fupp(1 + 2 * obj.arm.dof * obj.T + 1:1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T) = 50;
+            
+            signed_dist_contact_idx = 1 + 2 * obj.arm.dof * obj.T;
+            Fupp(signed_dist_contact_idx + 1:signed_dist_contact_idx + obj.arm.c * obj.T) = 1000;
+            
+            signed_dist_no_contact_idx = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
+            Fupp(signed_dist_no_contact_idx + 1:signed_dist_no_contact_idx + obj.T) = 1000;
         end
         
         function p = lin_interp(obj, p_start, p_end, t)

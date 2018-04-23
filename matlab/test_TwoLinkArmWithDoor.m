@@ -47,7 +47,20 @@ end
 
 %% Unit test for the signed distance function
 q = [pi/2 + 0.1; -pi/8; -2*pi/5];
-arm.show_state_debug(q, 2);
+% arm.show_state_debug(q, 2);
 
 q = [pi/2; 0; -pi/2];
-arm.show_state_debug(q, 3);
+% arm.show_state_debug(q, 3);
+
+q_min = [0; 0; -pi];
+q_max = [pi; pi; 0];
+for i = 1:1
+    q = rand_q(q_min, q_max);
+    arm.show_state_debug(q, 2);
+end
+
+function q = rand_q(q_min, q_max)
+    q = [q_min(1) + rand() * (q_max(1) - q_min(1));
+         q_min(2) + rand() * (q_max(2) - q_min(2));
+         q_min(3) + rand() * (q_max(3) - q_min(3))];
+end
