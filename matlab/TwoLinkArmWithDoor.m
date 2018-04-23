@@ -343,6 +343,68 @@ classdef TwoLinkArmWithDoor
             hold off;            
         end
         
+        function plot_traj(obj, traj, filename)
+            % Plots the arm and door following a trajectory
+            %
+            % Inputs:   traj    - sequence of configurations over time [q_0, q_1, ..., q_T]^T
+            % Outputs:  n/a
+            fig = figure(5);
+            hold on;
+            
+            axis([-3 3 -3 3]);
+
+            set(gca,'YTick',[]);
+            set(gca,'XTick',[]);
+
+            pos_base = [0; 0];
+            
+            ceiling = rectangle('Position',[-3 obj.door_hinge(2) 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+            
+            floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
+                'EdgeColor',[0.5 0.5 0.5], 'LineWidth',1);
+
+            for t = 0:size(traj, 1) - 1
+                % get the current configuration and elbow/ee/door positions
+                q = traj(t + 1, :)';
+
+                a = (t+1)/(size(traj, 1)+1);
+                
+                % TODO plot the arm
+                [pos_elbow, pos_ee] = obj.fwd_kinematics(q(1:2));
+                pos_door = obj.fwd_kin_door(q(3));
+                
+                link1 = plot([pos_base(1) pos_elbow(1)], [pos_base(2) pos_elbow(2)], 'k');
+                link2 = plot([pos_elbow(1) pos_ee(1)], [pos_elbow(2) pos_ee(2)], 'k');
+                link3 = plot([obj.door_hinge(1) pos_door(1)], [obj.door_hinge(2) pos_door(2)], 'k');
+                joint1 = scatter([pos_base(1) obj.door_hinge(1) pos_elbow(1)], [pos_base(2) obj.door_hinge(2) pos_elbow(2)], 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r');
+                joint2 = scatter([pos_door(1) pos_ee(1)], [pos_door(2) pos_ee(2)], 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k');
+                
+                set(link1, 'LineWidth', 5);
+                set(link2, 'LineWidth', 5);
+                set(link3, 'LineWidth', 5);
+                link1.Color(4) = a;
+                link2.Color(4) = a;
+                link3.Color(4) = a;
+                
+                if ~isempty(filename)
+                    frame = getframe(fig);
+                    im = frame2im(frame);
+                    [imind, cm] = rgb2ind(im, 256); 
+                    if t == 0
+                        imwrite(imind, cm, filename, 'gif', 'Loopcount', inf); 
+                    else
+                        imwrite(imind, cm, filename, 'gif', 'WriteMode', 'append');
+                    end
+                end
+    
+                if t ~= size(traj, 1)
+                    pause(0.1);
+                end
+            end
+            hold off;
+        end
+        
         function show_state_debug(obj, q, fig)
             % TODO function should display state of the robot and door,
             % with collision 
