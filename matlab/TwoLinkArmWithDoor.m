@@ -42,10 +42,14 @@ classdef TwoLinkArmWithDoor
             
             obj.q_min = [0; -pi / 2; -pi];
             obj.q_max = [pi; pi / 2; 0];
-            obj.dq_min = [-1; -1; -1];
-            obj.dq_max = [1; 1; 1];
-            obj.u_min = [-5; -5; 0];
-            obj.u_max = [5; 5; 0];
+%             obj.dq_min = [-1; -1; -1];
+%             obj.dq_max = [1; 1; 1];
+%             obj.u_min = [-5; -5; 0];
+%             obj.u_max = [5; 5; 0];
+            obj.dq_min = [-10; -10; -10];
+            obj.dq_max = [10; 10; 10];
+            obj.u_min = [-10; -10; 0];
+            obj.u_max = [10; 10; 0];
             
             % moment of inertia for rod of length l and mass m rotating
             % about its center
@@ -215,6 +219,24 @@ classdef TwoLinkArmWithDoor
             [dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door] = obj.signed_dist_no_contact_separate(q);
             % TODO (Ellis) make max signed distance a parameter
             dist = min([dist_floor_elbow, dist_ceil_elbow, dist_floor_ee, dist_ceil_ee, dist_link_door, 500]);
+        end
+        
+        function dist = signed_dist_no_contact_between(obj, q_t, q_t1)
+            % Linearly interpolate between q_t and q_t1 and check signed
+            % distance at each state, return min over all signed distances
+            % along the path
+            dist = 0;
+            % TODO (Ellis)-- what should this parameter be/where should it
+            % be?
+%             num_points = 10;
+            num_points = 100;
+            for i = 1:num_points
+                p = i / (num_points + 1);
+                q = q_t * (1 - p) + q_t1 * p;
+                dist_q = obj.signed_dist_no_contact(q);
+%                 fprintf('at %f dist is %f\n', p, dist_q);
+                dist = min(dist_q, dist);
+            end
         end
         
         function [s1, s2] = intersection(obj, l1_low, l1_high, l2_low, l2_high)
@@ -403,6 +425,34 @@ classdef TwoLinkArmWithDoor
                 end
             end
             hold off;
+        end
+        
+        function plot_dq_u(obj, traj_dq, traj_u, T)
+            figure(2);
+
+            subplot(2, 2, 1);
+            plot([1:1:T]', traj_u(:, 1));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$u_1(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 3);
+            plot([1:1:T]', traj_u(:, 2));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$u_2(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 2);
+            plot([1:1:T+1]', traj_dq(:, 1));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$\dot{q}_1(t)$', 'Interpreter', 'latex');
+
+            subplot(2, 2, 4);
+            plot([1:1:T+1]', traj_dq(:, 2));
+            axis([1 T min(obj.u_min) - 1 max(obj.u_max) + 1]);
+            xlabel('time $t$', 'Interpreter', 'latex');
+            ylabel('$\dot{q}_2(t)$', 'Interpreter', 'latex');
         end
         
         function show_state_debug(obj, q, fig)

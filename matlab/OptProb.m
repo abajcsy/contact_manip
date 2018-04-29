@@ -146,6 +146,8 @@ classdef OptProb
                 % enforce that the signed distance to non-contact objects
                 % is greater than or equal to zero
                 phi_no_contact_constraints = zeros(obj.T, 1);
+                
+                phi_no_contact_btwn_constraints = zeros(obj.T, 1);
 
                 for t=0:obj.T-1
 %                     h_t1 = obj.get_h(x,t+1);
@@ -179,6 +181,9 @@ classdef OptProb
                     
                     phi_no_contact = obj.arm.signed_dist_no_contact(q_t1);
                     phi_no_contact_constraints(t+1) = phi_no_contact;
+                    
+                    phi_no_contact_btwn = obj.arm.signed_dist_no_contact_between(q_t, q_t1);
+                    phi_no_contact_btwn_constraints(t+1) = phi_no_contact_btwn;
                 end
                 
                 % compute all pairwise h constraints
@@ -191,20 +196,21 @@ classdef OptProb
                     h_constraints(j) = h1+h2-h3-h4;
                 end
                 
-                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints; phi_no_contact_constraints];
+                f = [objective; kin_constraints; dyn_constraints; phi_constraints; phi_lambda_constraints; h_constraints; phi_no_contact_constraints; phi_no_contact_btwn_constraints];
             end
             
             F = @func;
             
             % Size of the constraint vector: 
-            %   objective                  1
-            %   kin_constraints            dof * T
-            %   dyn_constraints            dof * T
-            %   phi_constraints            T * c
-            %   phi_lambda_constraints     T
-            %   h_constraints              floor((T - 3) / 2)
-            %   phi_no_contact_constraints T
-            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2) + obj.T;
+            %   objective                       1
+            %   kin_constraints                 dof * T
+            %   dyn_constraints                 dof * T
+            %   phi_constraints                 T * c
+            %   phi_lambda_constraints          T
+            %   h_constraints                   floor((T - 3) / 2)
+            %   phi_no_contact_constraints      T
+            %   phi_no_contact_btwn_constraints T
+            num_constraints = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2) + obj.T + obj.T;
             Flow = zeros(num_constraints, 1);
             Fupp = zeros(num_constraints, 1);
             
@@ -222,6 +228,9 @@ classdef OptProb
             
             signed_dist_no_contact_idx = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2);
             Fupp(signed_dist_no_contact_idx + 1:signed_dist_no_contact_idx + obj.T) = 1000;
+            
+            signed_dist_no_contact_btwn_idx = 1 + 2 * obj.arm.dof * obj.T + obj.arm.c * obj.T + obj.T + floor((obj.T-3)/2) + obj.T;
+            Fupp(signed_dist_no_contact_btwn_idx + 1:signed_dist_no_contact_btwn_idx + obj.T) = 1000;
         end
         
         function p = lin_interp(obj, p_start, p_end, t)
