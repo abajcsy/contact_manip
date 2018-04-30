@@ -180,7 +180,7 @@ classdef TwoLinkArm
             scatter(pos_ee(1), pos_ee(2), 'o', 'MarkerFaceColor','k', 'MarkerEdgeColor', 'k', 'MarkerFaceAlpha', alpha, 'MarkerEdgeAlpha', alpha);
         end
         
-        function plot_traj(obj, traj, filename)
+        function plot_traj(obj, traj, traj_lambda, filename)
             % Plots the arm following a trajectory
             %
             % Inputs:   traj    - sequence of configurations over time [q_0, q_1, ..., q_T]^T
@@ -189,6 +189,12 @@ classdef TwoLinkArm
             fig = figure(1);
             hold on;
 
+            lamb_curr = traj_lambda(1,1);
+            dir = 0;
+            len = lamb_curr;
+            lamb_vec = quiver(1,0,dir,len);
+            set(lamb_vec,'LineWidth',3);
+            
             for t = 0:size(traj, 1) - 1
                                 
                 floor = rectangle('Position',[-3 -3 6 3]', 'FaceColor',[0.7 0.7 0.7], ... 
@@ -201,10 +207,20 @@ classdef TwoLinkArm
     
                 obj.plot(q, a);
 
-                axis([-2.5 2.5 -2.5 2.5]);
+                axis([-2.5 2.5 -0.5 4]);
     
                 set(gca,'YTick',[]);
                 set(gca,'XTick',[]);
+                
+                if (t+1) <= size(traj_lambda, 1)
+                    lamb_curr = traj_lambda(t+1,1);
+                    if lamb_curr ~= 0
+                        set(lamb_vec, 'Vdata', lamb_curr);
+                        set(lamb_vec, 'Color', 'red');
+                        uistack(lamb_vec,'top');
+                    end
+                end
+
             
                 if ~isempty(filename)
                     frame = getframe(fig);

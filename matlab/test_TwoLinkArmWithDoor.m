@@ -9,7 +9,7 @@ T = 5000;
 %path = '/home/abajcsy/hybrid_ws/src/contact_manip/matlab/';
 filename = ''; %strcat(path,'doorsim.gif');
 
-arm.simulate(q_init, dq_init, dt, T, filename);
+%arm.simulate(q_init, dq_init, dt, T, filename);
 
 %% Unit test line segment interesection 
 [s1, s2] = arm.intersection([0; 0], [1; 0], [0; 1], [1; 1]);

@@ -14,9 +14,13 @@ arm = TwoLinkArm(dof, c, m1, m2, l1, l2);
 global q_final;
 
 % initial and final configurations
-q_init = [pi / 2; 0; 0; 0];
-% q_final = [pi / 2; pi / 2; 0; 0]; % First way to initialize
-q_final = [pi; -pi / 2; 0; 0];  % Second way to initialize
+%q_init = [pi / 2; 0; 0; 0];
+q_init = [pi/2; -pi/4; 0; 0];
+%q_init = [0;0;0;0];
+%q_final = [pi / 2; -pi / 2; 0; 0]; % First way to initialize
+q_final = [0; pi / 2; 0; 0];  % Second way to initialize
+
+%q_final = [pi/2; 0; 0; 0];
 % q_final = [0; 0; 0; 0];         % Should initialize to all zeros 
 
 % number of timesteps
@@ -52,9 +56,10 @@ traj = optProb.get_traj(x_opt);
 traj_dq = optProb.get_traj_dq(x_opt);
 traj_u = optProb.get_traj_u(x_opt);
 traj_h = optProb.get_traj_h(x_opt);
+traj_lambda = optProb.get_traj_lambda(x_opt);
 
 % plot the arm's trajectory
-arm.plot_traj(traj, 'out.gif');
+arm.plot_traj(traj, traj_lambda, 'out.gif');
 
 % plot velocities and controls 
 arm.plot_dq_u(traj_dq, traj_u, T);

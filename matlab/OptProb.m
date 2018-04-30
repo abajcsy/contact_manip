@@ -359,6 +359,14 @@ classdef OptProb
             end          
         end
         
+        function traj_lambda = get_traj_lambda(obj, x)
+            % Extract just the lambdas from the solution
+            traj_lambda = zeros(obj.T, 1);
+            for t = 1:obj.T
+               lambda = obj.get_lambda(x, t);
+               traj_lambda(t) = lambda;
+            end
+        end
 
     end
 end

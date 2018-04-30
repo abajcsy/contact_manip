@@ -59,7 +59,7 @@ if nargin < 3 || isempty(l)
       if nargin < 5 || isempty(x0)
          x0 = min(max(ones(n,1),l),u);
          if nargin < 6
-            display   = false;
+            display   = true;
          end
       end
    end
